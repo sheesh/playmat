@@ -188,6 +188,7 @@ var STICKERS = ['🌟','🦄','🐙','🍉','🚀','🐝','🌈','🦖','🐸','
 var HUES = ['tomato','sun','grass','grape','bubble','sky','tangerine','teal'];
 
 var GAMES = [
+  {id:'letters',    name:'A is for…',    icon:'🅰️', c:'grape', rounds:5, kind:'learn', minAge:5},
   {id:'howmany',    name:'How Many?',      icon:'🔢', c:'grass',     rounds:5, kind:'learn'},
   {id:'monster',    name:'Feed Me',        icon:'👾', c:'teal',      rounds:4, kind:'learn'},
   {id:'more',       name:'Which Is More',  icon:'⚖️', c:'sun',     rounds:5, kind:'learn'},
@@ -198,19 +199,44 @@ var GAMES = [
   {id:'balloons',   name:'Pop',            icon:'🎈', c:'tomato',    rounds:3, kind:'play'},
   {id:'memory',     name:'Match',          icon:'🐼', c:'grape',     rounds:3, kind:'play'},
   {id:'different',  name:'Not the Same',   icon:'🔍', c:'teal',      rounds:5, kind:'play'},
+  {id:'mancala',    name:'Mancala',        icon:'🫘', c:'tangerine', rounds:1, kind:'play'},
   {id:'doodle',     name:'Doodle',         icon:'🖍️', c:'bubble', rounds:0, kind:'play'}
 ];
 
-var state = {age:3, sound:true, stickers:[]};
+/* Flip the two ages here if they are the wrong way round. */
+var KIDS = [
+  {id:'juniper', name:'Juniper', icon:'\ud83d\udc78', hue:'bubble', age:5},
+  {id:'francis', name:'Francis', icon:'\ud83e\uddcc', hue:'grass',  age:3}
+];
+function kid(){
+  for(var i=0;i<KIDS.length;i++) if(KIDS[i].id === state.player) return KIDS[i];
+  return KIDS[0];
+}
+/* state.age is derived from whoever is playing, so every game reads one thing. */
+function setPlayer(id){
+  state.player = id;
+  state.age = kid().age;
+  save();
+}
+function book(){
+  if(!state.books[state.player]) state.books[state.player] = [];
+  return state.books[state.player];
+}
+
+var state = {player:null, age:5, sound:true, books:{}};
 try{
   var saved = localStorage.getItem('playmat');
   if(saved){
     var s = JSON.parse(saved);
-    if(s && (s.age===3 || s.age===5)) state.age = s.age;
     if(s && typeof s.sound === 'boolean') state.sound = s.sound;
-    if(s && Array.isArray(s.stickers)) state.stickers = s.stickers.slice(0,60);
+    if(s && s.books && typeof s.books === 'object') state.books = s.books;
+    if(s && Array.isArray(s.stickers) && !s.books) state.books = {juniper:s.stickers.slice(0,24)};
+    if(s && s.player) setPlayerQuietly(s.player);
   }
 }catch(e){}
+function setPlayerQuietly(id){
+  for(var i=0;i<KIDS.length;i++) if(KIDS[i].id === id){ state.player = id; state.age = KIDS[i].age; }
+}
 function save(){ try{ localStorage.setItem('playmat', JSON.stringify(state)); }catch(e){} }
 
 /* ---------- helpers ---------- */
@@ -261,7 +287,14 @@ function tone(freq, dur, type, gain){
 var sfx = {
   tap:  function(){ tone(640, 0.11, 'triangle', 0.1); },
   pop:  function(){ tone(880, 0.1, 'triangle', 0.13); setTimeout(function(){ tone(1180, 0.08, 'sine', 0.07); }, 55); },
-  good: function(){ tone(523, 0.12, 'triangle', 0.1); setTimeout(function(){ tone(784, 0.2, 'triangle', 0.1); }, 110); },
+  good: function(){
+    /* a different little tune each time, so five rounds don't grate */
+    var jingles = [[523,659,784],[587,740,880],[659,784,988],[523,784,1047],[440,554,659,880],[698,880,1047]];
+    var tune = jingles[rnd(jingles.length)];
+    for(var i=0;i<tune.length;i++){
+      (function(f, n){ setTimeout(function(){ tone(f, 0.19, 'triangle', 0.11); }, n*95); })(tune[i], i);
+    }
+  },
   nope: function(){ tone(196, 0.16, 'sine', 0.07); },
   win:  function(){ [523,659,784,1047].forEach(function(f,i){ setTimeout(function(){ tone(f, 0.22, 'triangle', 0.1); }, i*115); }); }
 };
@@ -307,21 +340,42 @@ function soundButton(){
 function homeBar(){
   bar.innerHTML = '';
   bar.appendChild(el('div','brand','tray table <b>playmat</b>'));
-  var seg = el('div','seg');
-  seg.appendChild(el('span','kicker','age'));
-  [3,5].forEach(function(n){
-    var p = chunk(state.age===n ? 'sun' : null, 'pill', String(n));
-    p.setAttribute('aria-pressed', state.age===n ? 'true' : 'false');
-    p.setAttribute('aria-label', 'Set up for age ' + n);
-    p.onclick = function(){ state.age = n; save(); sfx.tap(); renderHome(); };
-    seg.appendChild(p);
-  });
-  bar.appendChild(seg);
+  var k = kid();
+  var who = chunk(k.hue, 'who',
+    '<span class="wicon">' + k.icon + '</span><span class="wname">' + k.name + '</span>');
+  who.setAttribute('aria-label', 'Playing as ' + k.name + '. Tap to switch.');
+  who.onclick = function(){ sfx.tap(); renderPicker(); };
+  bar.appendChild(who);
   bar.appendChild(soundButton());
+}
+
+/* The opening screen: one big button each. */
+function renderPicker(){
+  try{ speechSynthesis.cancel(); }catch(e){}
+  bar.innerHTML = '';
+  bar.appendChild(el('div','brand','tray table <b>playmat</b>'));
+  bar.appendChild(soundButton());
+  stage.innerHTML = '';
+  var wrap = el('div','picker');
+  KIDS.forEach(function(k){
+    var b = chunk(k.hue, 'kid',
+      '<span class="kicon">' + k.icon + '</span><span class="kname">' + k.name + '</span>');
+    b.setAttribute('aria-label', k.name);
+    b.onclick = function(){
+      sfx.tap();
+      setPlayer(k.id);
+      renderHome();
+      say('Hello ' + k.name);
+    };
+    wrap.appendChild(b);
+  });
+  stage.appendChild(wrap);
+  stage.appendChild(el('p','hint-line','Who is playing?'));
+  say('Who is playing?');
 }
 function gameBar(g, done){
   bar.innerHTML = '';
-  var back = chunk(null,'mini','⬅️');
+  var back = chunk('sun','homebtn','<span class="hicon">🏠</span><span class="htext">home</span>');
   back.setAttribute('aria-label','Back to all games');
   back.onclick = function(){ sfx.tap(); renderHome(); };
   bar.appendChild(back);
@@ -348,6 +402,7 @@ function renderHome(){
     var tiles = el('div','tiles');
     GAMES.forEach(function(g){
       if(g.kind !== sec.k) return;
+      if(g.minAge && state.age < g.minAge) return;
       var b = chunk(g.c, 'tile');
       b.appendChild(el('span','ticon', g.icon));
       b.appendChild(el('span','tname', g.name));
@@ -355,11 +410,11 @@ function renderHome(){
       tiles.appendChild(b);
     });
     if(sec.k === 'play'){
-      var book = chunk(null,'tile');
-      book.appendChild(el('span','ticon','\ud83d\udcd6'));
-      book.appendChild(el('span','tname','Stickers \u00b7 ' + state.stickers.length));
-      book.onclick = function(){ sfx.tap(); renderBook(); };
-      tiles.appendChild(book);
+      var bookTile = chunk(null,'tile');
+      bookTile.appendChild(el('span','ticon','\ud83d\udcd6'));
+      bookTile.appendChild(el('span','tname','Stickers \u00b7 ' + book().length));
+      bookTile.onclick = function(){ sfx.tap(); renderBook(); };
+      tiles.appendChild(bookTile);
     }
     mat.appendChild(tiles);
   });
@@ -370,30 +425,31 @@ function renderHome(){
 /* ---------- sticker book ---------- */
 function renderBook(){
   bar.innerHTML = '';
-  var back = chunk(null,'mini','⬅️');
+  var back = chunk('sun','homebtn','<span class="hicon">🏠</span><span class="htext">home</span>');
   back.setAttribute('aria-label','Back to all games');
   back.onclick = function(){ sfx.tap(); renderHome(); };
   bar.appendChild(back);
-  bar.appendChild(el('div','gname','Sticker Book'));
+  bar.appendChild(el('div','gname', kid().name + "'s Stickers"));
   bar.appendChild(el('div','pips'));
   bar.appendChild(soundButton());
   stage.innerHTML = '';
   var book = el('div','book');
   for(var i=0;i<24;i++){
-    var has = state.stickers[i];
+    var has = book()[i];
     book.appendChild(el('div','slot' + (has ? ' has' : ''), has || ''));
   }
   stage.appendChild(book);
-  stage.appendChild(el('p','hint-line', state.stickers.length ? 'Finish a game to win another sticker.' : 'Win a sticker by finishing any game.'));
+  stage.appendChild(el('p','hint-line', book().length ? 'Finish a game to win another sticker.' : 'Win a sticker by finishing any game.'));
 }
 
 function earnSticker(){
-  var left = STICKERS.filter(function(s){ return state.stickers.indexOf(s) < 0; });
-  var s = left.length ? pick(left) : pick(STICKERS);
-  state.stickers.push(s);
-  if(state.stickers.length > 24) state.stickers.shift();
+  var mine = book();
+  var left = STICKERS.filter(function(s){ return mine.indexOf(s) < 0; });
+  var won = left.length ? pick(left) : pick(STICKERS);
+  mine.push(won);
+  if(mine.length > 24) mine.shift();
   save();
-  return s;
+  return won;
 }
 
 /* ---------- game shell ---------- */
@@ -833,20 +889,28 @@ BUILD.train = function(api){
   round();
 };
 
-/* ---------- 7. doodle pad: no rules, no end ---------- */
+/* ---------- 7. doodle pad, Kid Pix style ------------------------------------
+   Crayons, a rainbow brush, a sparkle brush, stamps, and an eraser that blows
+   the picture up, because that was the best part of Kid Pix. No rules, no end. */
 BUILD.doodle = function(api){
   api.play.className = 'play fill';
   api.play.style.display = 'flex';
   api.play.style.flexDirection = 'column';
-  api.play.style.gap = '10px';
+  api.play.style.gap = '8px';
   var cv = el('canvas','pad');
-  var tools = el('div','tools');
+  var paints = el('div','tools');
+  var kit = el('div','tools');
   api.play.innerHTML = '';
   api.play.appendChild(cv);
-  api.play.appendChild(tools);
+  api.play.appendChild(paints);
+  api.play.appendChild(kit);
+
   var g2 = cv.getContext('2d');
   var COLS = ['#1B2435','#F4634E','#FF9F52','#FFC031','#4CC483','#2E86B8','#A186E4','#FF93C6'];
-  var colour = COLS[1], stamp = null, drawing = false, lx = 0, ly = 0;
+  var STAMPS = ['⭐','❤️','🌈','🦄','🐙','🌸'];
+  var SPARKS = ['✨','⭐','🌟','💫'];
+  var colour = COLS[1], mode = 'crayon', stamp = null;
+  var drawing = false, lx = 0, ly = 0, hue = 0, travelled = 0;
 
   function fit(){
     var r = cv.getBoundingClientRect();
@@ -873,64 +937,137 @@ BUILD.doodle = function(api){
     var r = cv.getBoundingClientRect();
     return {x:(e.clientX - r.left) * (cv.width / r.width), y:(e.clientY - r.top) * (cv.height / r.height)};
   }
+  function drawEmoji(symbol, x, y, scale){
+    g2.save();
+    g2.translate(x, y);
+    g2.rotate(Math.random() * 6.283);
+    g2.font = Math.round(cv.width * scale) + 'px serif';
+    g2.textAlign = 'center';
+    g2.textBaseline = 'middle';
+    g2.fillText(symbol, 0, 0);
+    g2.restore();
+  }
+
   cv.addEventListener('pointerdown', function(e){
     e.preventDefault();
-    var p = at(e);
-    if(stamp){
-      g2.font = Math.round(cv.width * 0.11) + 'px serif';
-      g2.textAlign = 'center';
-      g2.textBaseline = 'middle';
-      g2.fillText(stamp, p.x, p.y);
+    var pt = at(e);
+    if(mode === 'stamp' && stamp){
+      drawEmoji(stamp, pt.x, pt.y, 0.11);
       sfx.pop();
       return;
     }
-    drawing = true; lx = p.x; ly = p.y;
+    drawing = true; lx = pt.x; ly = pt.y; travelled = 0;
     try{ cv.setPointerCapture(e.pointerId); }catch(err){}
-    g2.strokeStyle = colour;
-    g2.lineWidth = Math.max(7, cv.width * 0.022);
+    g2.lineWidth = Math.max(8, cv.width * (mode === 'rainbow' ? 0.03 : 0.022));
+    if(mode === 'sparkle'){ drawEmoji(pick(SPARKS), pt.x, pt.y, 0.055); return; }
+    g2.strokeStyle = mode === 'rainbow' ? 'hsl(' + hue + ',85%,55%)' : colour;
     g2.beginPath();
-    g2.moveTo(p.x, p.y);
-    g2.lineTo(p.x + 0.1, p.y);
+    g2.moveTo(pt.x, pt.y);
+    g2.lineTo(pt.x + 0.1, pt.y);
     g2.stroke();
   });
+
   cv.addEventListener('pointermove', function(e){
     if(!drawing) return;
     e.preventDefault();
-    var p = at(e);
+    var pt = at(e);
+    var step = Math.abs(pt.x - lx) + Math.abs(pt.y - ly);
+    if(mode === 'sparkle'){
+      travelled += step;
+      if(travelled > cv.width * 0.06){
+        travelled = 0;
+        drawEmoji(pick(SPARKS), pt.x + (Math.random() * 30 - 15), pt.y + (Math.random() * 30 - 15), 0.055);
+      }
+      lx = pt.x; ly = pt.y;
+      return;
+    }
+    if(mode === 'rainbow'){
+      hue = (hue + 7) % 360;
+      g2.strokeStyle = 'hsl(' + hue + ',85%,55%)';
+    }
     g2.beginPath();
     g2.moveTo(lx, ly);
-    g2.lineTo(p.x, p.y);
+    g2.lineTo(pt.x, pt.y);
     g2.stroke();
-    lx = p.x; ly = p.y;
+    lx = pt.x; ly = pt.y;
   });
   function stop(){ drawing = false; }
   cv.addEventListener('pointerup', stop);
   cv.addEventListener('pointercancel', stop);
 
-  function clearPressed(){
-    var all = tools.querySelectorAll('[aria-pressed]');
+  function boom(){
+    var notes = [740, 560, 410, 300, 200];
+    for(var i=0;i<notes.length;i++){
+      (function(f, n){ setTimeout(function(){ tone(f, 0.17, 'sawtooth', 0.09); }, n * 70); })(notes[i], i);
+    }
+    cv.classList.add('boom');
+    var started = Date.now();
+    (function burst(){
+      var done = (Date.now() - started) / 430;
+      if(done >= 1 || !cv.isConnected){
+        g2.fillStyle = '#fff';
+        g2.fillRect(0, 0, cv.width, cv.height);
+        cv.classList.remove('boom');
+        return;
+      }
+      for(var k=0;k<3;k++){
+        g2.fillStyle = 'rgba(255,255,255,0.55)';
+        g2.beginPath();
+        g2.arc(Math.random() * cv.width, Math.random() * cv.height, done * cv.width * 0.3, 0, 6.3);
+        g2.fill();
+      }
+      requestAnimationFrame(burst);
+    })();
+  }
+
+  function unpress(){
+    var all = api.play.querySelectorAll('[aria-pressed]');
     for(var i=0;i<all.length;i++) all[i].setAttribute('aria-pressed','false');
   }
+
   COLS.forEach(function(c){
-    var s = el('button','swatch');
-    s.type = 'button';
-    s.style.background = c;
-    s.setAttribute('aria-label','Crayon');
-    s.setAttribute('aria-pressed', c === colour ? 'true' : 'false');
-    s.onclick = function(){ colour = c; stamp = null; clearPressed(); s.setAttribute('aria-pressed','true'); sfx.tap(); };
-    tools.appendChild(s);
+    var sw = el('button','swatch');
+    sw.type = 'button';
+    sw.style.background = c;
+    sw.setAttribute('aria-label','Crayon');
+    sw.setAttribute('aria-pressed', c === colour ? 'true' : 'false');
+    sw.onclick = function(){
+      colour = c; mode = 'crayon'; stamp = null;
+      unpress(); sw.setAttribute('aria-pressed','true');
+      sfx.tap();
+    };
+    paints.appendChild(sw);
   });
-  ['⭐','❤️','🌈'].forEach(function(em){
-    var b = chunk(null,'stamp', em);
+
+  [{m:'rainbow', icon:'🌈', label:'Rainbow brush'},
+   {m:'sparkle', icon:'✨', label:'Sparkle brush'}].forEach(function(t){
+    var b = chunk(null,'stamp', t.icon);
+    b.setAttribute('aria-label', t.label);
+    b.setAttribute('aria-pressed','false');
+    b.onclick = function(){
+      mode = t.m; stamp = null;
+      unpress(); b.setAttribute('aria-pressed','true');
+      sfx.tap();
+    };
+    kit.appendChild(b);
+  });
+
+  STAMPS.forEach(function(symbol){
+    var b = chunk(null,'stamp', symbol);
     b.setAttribute('aria-label','Stamp');
     b.setAttribute('aria-pressed','false');
-    b.onclick = function(){ stamp = em; clearPressed(); b.setAttribute('aria-pressed','true'); sfx.tap(); };
-    tools.appendChild(b);
+    b.onclick = function(){
+      mode = 'stamp'; stamp = symbol;
+      unpress(); b.setAttribute('aria-pressed','true');
+      sfx.tap();
+    };
+    kit.appendChild(b);
   });
-  var wipe = chunk('tomato','stamp','🧽');
-  wipe.setAttribute('aria-label','Start a clean page');
-  wipe.onclick = function(){ g2.fillStyle = '#fff'; g2.fillRect(0, 0, cv.width, cv.height); sfx.tap(); };
-  tools.appendChild(wipe);
+
+  var blow = chunk('tomato','stamp','💥');
+  blow.setAttribute('aria-label','Blow up the picture');
+  blow.onclick = boom;
+  kit.appendChild(blow);
 };
 
 /* ---------- 8. how many? count the things, tap the numeral ---------- */
@@ -1121,6 +1258,226 @@ BUILD.samekind = function(api){
   round();
 };
 
+/* ---------- A is for… teaching letters to someone who barely has them ----------
+   Each round models the letter first ("This is A. A is for apple."), gives one
+   giant A to tap, and only then asks her to pick it out of three. She hears the
+   sound while only ever being asked to match a shape, so she cannot fail. */
+BUILD.letters = function(api){
+  var LW = [
+    {e:'🍎', w:'apple', l:'A'},   {e:'⚽', w:'ball', l:'B'},
+    {e:'🐱', w:'cat', l:'C'},     {e:'🐶', w:'dog', l:'D'},
+    {e:'🐘', w:'elephant', l:'E'},{e:'🐟', w:'fish', l:'F'},
+    {e:'🍇', w:'grapes', l:'G'},  {e:'🎩', w:'hat', l:'H'},
+    {e:'🔑', w:'key', l:'K'},     {e:'🦁', w:'lion', l:'L'},
+    {e:'🌙', w:'moon', l:'M'},    {e:'👃', w:'nose', l:'N'},
+    {e:'🐷', w:'pig', l:'P'},     {e:'🚀', w:'rocket', l:'R'},
+    {e:'☀️', w:'sun', l:'S'},   {e:'🌳', w:'tree', l:'T'},
+    {e:'🐳', w:'whale', l:'W'},   {e:'🦓', w:'zebra', l:'Z'}
+  ];
+  var target = null;
+
+  function card(tail){
+    return '<span class="num">' + target.l + '</span>' +
+           '<span class="big">' + target.e + '</span>' +
+           '<span class="ptext">' + tail + '</span>';
+  }
+
+  function teach(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    api.prompt(card(target.l + ' is for ' + target.w),
+      'This is ' + target.l + '. ' + target.l + ' is for ' + target.w + '. Tap the ' + target.l + '.');
+    var one = centred(el('div','grid'), 1, 190);
+    var b = chunk('grape','opt numeric', target.l);
+    b.setAttribute('aria-label', target.l);
+    var used = false;
+    b.onclick = function(){
+      if(used) return;
+      used = true;
+      sfx.pop();
+      say(target.l + ' is for ' + target.w);
+      setTimeout(find, 1100);
+    };
+    one.appendChild(b);
+    api.play.innerHTML = '';
+    api.play.appendChild(one);
+  }
+
+  function find(){
+    if(!api.play.isConnected) return;
+    api.prompt(card('now find the ' + target.l), 'Now find the ' + target.l);
+    var others = shuffle(LW.filter(function(x){ return x.l !== target.l; })).slice(0, 2);
+    var items = shuffle([{l:target.l, ok:true}, {l:others[0].l, ok:false}, {l:others[1].l, ok:false}]);
+    var grid = centred(el('div','grid'), 3, 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var finished = false, wrong = 0, right = null;
+    items.forEach(function(it){
+      var b = chunk(null,'opt numeric', it.l);
+      b.setAttribute('aria-label', it.l);
+      if(it.ok) right = b;
+      b.onclick = function(){
+        if(finished) return;
+        if(it.ok){
+          finished = true;
+          b.classList.add('gone');
+          sfx.pop();
+          say(target.l + '!');
+          if(!api.score()) setTimeout(round, 1200);
+        } else {
+          wrong++;
+          api.nope(b);
+          if(right) right.classList.add('bob');   /* one wrong tap is enough to help */
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+
+  function round(){
+    if(!api.play.isConnected) return;
+    target = pick(LW);
+    teach();
+  }
+  round();
+};
+
+/* ---------- Mancala ----------------------------------------------------------
+   Real rules (sow counterclockwise, free turn on landing in your own store,
+   capture the pit opposite an empty one you land in), but three beans a pit so
+   a game lasts a few minutes, and nobody is told they lost. The bean count sits
+   on every pit, so it doubles as counting practice. */
+BUILD.mancala = function(api){
+  var PITS = 6, SEED = 3, MINE = 6, THEIRS = 13;
+  var board = [], busy = false, over = false;
+
+  function mySideEmpty(){
+    for(var i=0;i<PITS;i++) if(board[i] > 0) return false;
+    return true;
+  }
+  function theirSideEmpty(){
+    for(var i=7;i<13;i++) if(board[i] > 0) return false;
+    return true;
+  }
+
+  function pitView(index, mine){
+    var n = board[index];
+    var live = mine && n > 0 && !busy && !over;
+    var b;
+    if(mine){
+      b = chunk(live ? 'grass' : null, 'pit', String(n));
+      if(live) b.onclick = function(){ play(index); };
+    } else {
+      b = el('div','pit still', String(n));
+    }
+    b.setAttribute('aria-label', n + (n === 1 ? ' bean' : ' beans'));
+    return b;
+  }
+
+  function draw(){
+    api.play.className = 'play fill';
+    api.play.innerHTML = '';
+    var wrap = el('div','mancala');
+    wrap.appendChild(el('div','store',
+      '<span class="sicon">🧌</span><span class="snum">' + board[THEIRS] + '</span>'));
+    var rows = el('div','rows');
+    var top = el('div','mrow');
+    for(var i=PITS-1;i>=0;i--) top.appendChild(pitView(i+7, false));
+    var bottom = el('div','mrow');
+    for(var j=0;j<PITS;j++) bottom.appendChild(pitView(j, true));
+    rows.appendChild(top);
+    rows.appendChild(bottom);
+    wrap.appendChild(rows);
+    wrap.appendChild(el('div','store',
+      '<span class="sicon">' + kid().icon + '</span><span class="snum">' + board[MINE] + '</span>'));
+    api.play.appendChild(wrap);
+  }
+
+  function sow(start, mine, done){
+    var hand = board[start];
+    board[start] = 0;
+    var at = start;
+    draw();
+    function step(){
+      if(!api.play.isConnected) return;
+      if(hand === 0){ done(at); return; }
+      at = (at + 1) % 14;
+      if(mine && at === THEIRS) at = (at + 1) % 14;
+      if(!mine && at === MINE) at = (at + 1) % 14;
+      board[at]++;
+      hand--;
+      sfx.tap();
+      draw();
+      setTimeout(step, 170);
+    }
+    setTimeout(step, 130);
+  }
+
+  function after(last, mine){
+    var store = mine ? MINE : THEIRS;
+    var low = mine ? 0 : 7, high = mine ? 5 : 12;
+    if(last >= low && last <= high && board[last] === 1){
+      var facing = 12 - last;                 /* the pit across the board */
+      if(board[facing] > 0){
+        board[store] += board[facing] + 1;
+        board[facing] = 0;
+        board[last] = 0;
+        sfx.pop();
+      }
+    }
+    draw();
+    if(mySideEmpty() || theirSideEmpty()){ sweep(); return; }
+    if(last === store){                        /* landed in your own store: go again */
+      if(mine){ busy = false; draw(); say('Go again!'); }
+      else setTimeout(monster, 700);
+      return;
+    }
+    if(mine) setTimeout(monster, 700);
+    else { busy = false; draw(); }
+  }
+
+  function monster(){
+    if(over || !api.play.isConnected) return;
+    var moves = [];
+    for(var i=7;i<13;i++) if(board[i] > 0) moves.push(i);
+    if(!moves.length){ sweep(); return; }
+    var free = null;
+    for(var k=0;k<moves.length;k++) if(moves[k] + board[moves[k]] === THEIRS) free = moves[k];
+    busy = true;
+    draw();
+    sow(free !== null ? free : pick(moves), false, function(last){ after(last, false); });
+  }
+
+  function play(index){
+    if(busy || over || board[index] === 0) return;
+    busy = true;
+    draw();
+    sow(index, true, function(last){ after(last, true); });
+  }
+
+  function sweep(){
+    for(var i=0;i<PITS;i++){ board[MINE] += board[i]; board[i] = 0; }
+    for(var j=7;j<13;j++){ board[THEIRS] += board[j]; board[j] = 0; }
+    over = true;
+    busy = true;
+    draw();
+    var mine = board[MINE], theirs = board[THEIRS];
+    var line = mine > theirs ? (kid().name + ' wins!')
+             : (mine === theirs ? "It's a tie!" : 'So close!');
+    api.promptHTML('<span class="num">' + mine + '</span><span class="ptext">' + line + '</span>' +
+                   '<span class="num">' + theirs + '</span>');
+    say(line);
+    setTimeout(function(){ api.score(); }, 1100);
+  }
+
+  board = [];
+  for(var i=0;i<14;i++) board.push(0);
+  for(var j=0;j<PITS;j++){ board[j] = SEED; board[j+7] = SEED; }
+  api.prompt('<span class="big">🫘</span><span class="ptext">tap your beans to move them</span>',
+             'Tap your beans to move them');
+  draw();
+};
+
 /* ---------- boot ---------- */
 document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
@@ -1136,12 +1493,12 @@ var booted = false;
 function boot(data){
   if(booted) return;
   booted = true;
-  if(data && (data.age === 3 || data.age === 5)) state.age = data.age;
-  renderHome();
+  if(data && data.player) setPlayerQuietly(data.player);
+  if(state.player) renderHome(); else renderPicker();
 }
 try{
   if(window.claude && window.claude.hot){
-    if(window.claude.hot.snapshot) window.claude.hot.snapshot(function(){ return {age:state.age}; });
+    if(window.claude.hot.snapshot) window.claude.hot.snapshot(function(){ return {player:state.player}; });
     if(window.claude.hot.ready) window.claude.hot.ready(boot);
     else boot(window.claude.hot.data || {});
   } else boot({});
@@ -1153,6 +1510,44 @@ try{
 .car{display:grid; place-items:center; width:clamp(36px,10.5vw,52px); height:clamp(36px,10.5vw,52px); border-radius:12px; background:var(--mat); color:var(--ink); font-size:clamp(21px,6vw,30px)}
 .car.q{background:var(--sun); color:var(--on-color); font-weight:800}
 .prompt.train{gap:6px}
+
+/* the Kid Pix eraser */
+@keyframes boomshake{
+  0%,100%{transform:translate(0,0) rotate(0)}
+  15%{transform:translate(-7px,4px) rotate(-1deg)}
+  30%{transform:translate(7px,-4px) rotate(1deg)}
+  45%{transform:translate(-6px,-3px) rotate(-1deg)}
+  65%{transform:translate(6px,3px) rotate(1deg)}
+  85%{transform:translate(-3px,1px) rotate(0)}
+}
+.pad.boom{animation:boomshake .43s ease}
+
+/* mancala */
+.mancala{display:flex; align-items:center; gap:8px; width:100%; height:100%}
+.store{flex:0 0 auto; width:clamp(54px,15vw,78px); align-self:stretch; max-height:300px; border-radius:36px; background:var(--mat); color:var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px}
+.store .sicon{font-size:22px; line-height:1}
+.store .snum{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums}
+.rows{flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; justify-content:center}
+.mrow{display:grid; grid-template-columns:repeat(6,1fr); gap:7px}
+.pit{aspect-ratio:1; max-height:76px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:clamp(15px,4.4vw,22px); font-variant-numeric:tabular-nums; box-shadow:0 5px 0 var(--ce,var(--card-edge))}
+.pit.still{background:var(--mat); color:var(--ink); box-shadow:none; border:3px solid var(--line)}
+
+/* who is playing */
+.picker{flex:1; min-height:0; display:flex; flex-direction:column; gap:16px; justify-content:center}
+.kid{flex:1; max-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px}
+.kid .kicon{font-size:clamp(60px,17vw,110px); line-height:1.05}
+.kid .kname{font-size:clamp(22px,6.5vw,34px); font-weight:800}
+@media (min-width:620px){.picker{flex-direction:row}.kid{max-height:none}}
+.who{display:flex; align-items:center; gap:7px; padding:0 14px; height:46px; border-radius:15px; box-shadow:0 4px 0 var(--ce,var(--card-edge))}
+.who:active{transform:translateY(3px); box-shadow:0 1px 0 var(--ce,var(--card-edge))}
+.who .wicon{font-size:22px; line-height:1}
+.who .wname{font-size:15px; font-weight:800}
+
+/* the way out, big enough that a three-year-old finds it */
+.homebtn{min-width:70px; height:56px; border-radius:17px; display:grid; place-items:center; gap:0; padding:0 8px; box-shadow:0 5px 0 var(--ce,var(--card-edge))}
+.homebtn:active{transform:translateY(4px); box-shadow:0 1px 0 var(--ce,var(--card-edge))}
+.homebtn .hicon{font-size:25px; line-height:1}
+.homebtn .htext{font-size:9px; font-weight:800; letter-spacing:.12em; text-transform:uppercase}
 .mat{display:flex; flex-direction:column; gap:8px}
 .mat .kicker{padding:7px 2px 0}
 .tiles{display:grid; gap:12px; grid-template-columns:repeat(2,1fr)}
