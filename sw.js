@@ -1,5 +1,6 @@
-/* Cache first: once installed the app never needs the network again. */
-var CACHE = 'playmat-v1';
+/* Cache first: once installed the app never needs the network again.
+   CACHE is stamped by make-pwa.py from a hash of index.html — do not edit by hand. */
+var CACHE = 'playmat-0211c63e1133';
 var ASSETS = ['./', './index.html', './manifest.webmanifest',
               './icon-180.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 
