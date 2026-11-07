@@ -1,0 +1,1174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<title>Tray Table Playmat</title>
+
+<!-- installs to the home screen and launches without browser chrome -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Playmat">
+<meta name="theme-color" content="#F2FAFD" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131A27" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+
+<style>
+/* the few rules the artifact host normally supplies */
+html{height:100%; box-sizing:border-box; color-scheme:light dark;
+     padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0; height:100%}
+img{max-width:100%}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<style>
+:root{
+  --paper:#F2FAFD; --mat:#D7EDF8; --card:#FFFFFF; --card-edge:#C2DDEB;
+  --ink:#223049; --ink-soft:#5E7290; --line:#B9D7E6; --pip-off:#BFD9E7;
+  --on-color:#1B2435;
+  --veil:rgba(34,48,73,.45);
+  --tomato:#F4634E; --tomato-e:#C3432F;
+  --sun:#FFC031;    --sun-e:#D1911A;
+  --grass:#4CC483;  --grass-e:#2A8D57;
+  --grape:#A186E4;  --grape-e:#6E52B5;
+  --bubble:#FF93C6; --bubble-e:#D1619B;
+  --sky:#5DB9E8;    --sky-e:#2E86B8;
+  --tangerine:#FF9F52; --tangerine-e:#D16F24;
+  --teal:#4FCFC0;   --teal-e:#2A9C90;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#131A27; --mat:#1E2737; --card:#29344A; --card-edge:#141C29;
+    --ink:#F0F5FB; --ink-soft:#A4B5CD; --line:#3C4A63; --pip-off:#44536E;
+    --veil:rgba(8,12,20,.6);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#131A27; --mat:#1E2737; --card:#29344A; --card-edge:#141C29;
+  --ink:#F0F5FB; --ink-soft:#A4B5CD; --line:#3C4A63; --pip-off:#44536E;
+  --veil:rgba(8,12,20,.6);
+}
+html,body{height:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:ui-rounded,"SF Pro Rounded","Hiragino Maru Gothic ProN",Nunito,"Trebuchet MS",system-ui,sans-serif;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  touch-action:manipulation; overscroll-behavior:none; overflow:hidden;
+}
+#app{height:100%; display:flex; flex-direction:column; min-height:0}
+#bar{display:flex; align-items:center; gap:8px; padding:10px 16px 6px; flex:0 0 auto}
+#stage{flex:1; min-height:0; display:flex; flex-direction:column; gap:12px; padding:0 16px 16px}
+
+.brand{font-size:19px; font-weight:800; letter-spacing:-.01em; margin-right:auto}
+.brand b{color:var(--sky-e); font-weight:800}
+.kicker{font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--ink-soft)}
+
+/* chunky toy button: a solid bottom edge that compresses when pressed */
+.chunk{
+  -webkit-appearance:none; appearance:none; border:0; font:inherit; cursor:pointer;
+  background:var(--c,var(--card)); color:var(--on-color);
+  border-radius:20px; box-shadow:0 6px 0 var(--ce,var(--card-edge));
+  transition:transform .07s ease, box-shadow .07s ease;
+}
+.chunk.plain{color:var(--ink)}
+.chunk:active{transform:translateY(5px); box-shadow:0 1px 0 var(--ce,var(--card-edge))}
+.chunk:focus-visible{outline:3px solid var(--ink); outline-offset:3px}
+.mini{min-width:46px; height:46px; border-radius:15px; box-shadow:0 4px 0 var(--ce,var(--card-edge)); font-size:20px; display:grid; place-items:center; padding:0 10px}
+.mini:active{transform:translateY(3px); box-shadow:0 1px 0 var(--ce,var(--card-edge))}
+.seg{display:flex; gap:5px; align-items:center}
+.pill{min-width:40px; height:40px; border-radius:13px; font-size:17px; font-weight:800; box-shadow:0 4px 0 var(--ce,var(--card-edge)); display:grid; place-items:center}
+.pill[aria-pressed="true"]{--c:var(--sun); --ce:var(--sun-e)}
+.pill:active{transform:translateY(3px); box-shadow:0 1px 0 var(--ce,var(--card-edge))}
+
+/* home play mat */
+.mat{flex:1; min-height:0; overflow-y:auto; display:grid; gap:12px; grid-template-columns:repeat(2,1fr); align-content:start; padding-bottom:4px}
+@media (min-width:620px){.mat{grid-template-columns:repeat(3,1fr)}}
+.tile{min-height:116px; display:grid; place-content:center; gap:4px; padding:12px 8px; text-align:center}
+.tile .ticon{font-size:clamp(38px,9vw,54px); line-height:1.05}
+.tile .tname{font-size:15px; font-weight:800}
+.hint-line{font-size:13px; color:var(--ink-soft); text-align:center; padding:2px 0 0}
+
+/* game chrome */
+.pips{display:flex; gap:6px; margin-left:auto}
+.pip{width:13px; height:13px; border-radius:50%; background:var(--pip-off)}
+.pip.on{background:var(--sun); box-shadow:inset 0 -3px 0 var(--sun-e)}
+.gname{font-size:16px; font-weight:800}
+
+.prompt{
+  flex:0 0 auto; background:var(--card); color:var(--ink); border-radius:22px;
+  box-shadow:0 5px 0 var(--card-edge); padding:12px 16px; min-height:86px;
+  display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; cursor:pointer;
+}
+.prompt .big{font-size:clamp(40px,11vw,68px); line-height:1}
+.prompt .num{font-size:clamp(44px,12vw,76px); font-weight:800; line-height:1; font-variant-numeric:tabular-nums}
+.prompt .ptext{font-size:15px; font-weight:700; color:var(--ink-soft)}
+.dots{display:flex; gap:7px}
+.dot{width:17px; height:17px; border-radius:50%; border:3px solid var(--line)}
+.dot.on{background:var(--grass); border-color:var(--grass-e)}
+
+.play{flex:1; min-height:0; display:grid; place-content:center; align-content:center; gap:12px}
+.play.fill{place-content:stretch; align-content:stretch}
+.grid{display:grid; gap:12px; width:100%}
+.opt{aspect-ratio:1; display:grid; place-items:center; font-size:clamp(32px,9.5vw,58px); max-height:30vh}
+.opt.numeric{font-size:clamp(34px,10vw,62px); font-weight:800; font-variant-numeric:tabular-nums}
+.row{display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
+
+@keyframes wob{0%,100%{transform:translateX(0)}20%{transform:translateX(-9px) rotate(-5deg)}40%{transform:translateX(9px) rotate(5deg)}60%{transform:translateX(-6px) rotate(-3deg)}80%{transform:translateX(6px) rotate(3deg)}}
+.wob{animation:wob .42s ease}
+@keyframes popout{to{transform:scale(0) rotate(25deg); opacity:0}}
+.gone{animation:popout .3s ease forwards; pointer-events:none}
+@keyframes bob{50%{transform:translateY(-8px)}}
+.bob{animation:bob .75s ease-in-out infinite}
+
+/* balloons */
+.sky{position:relative; flex:1; min-height:0; overflow:hidden; border-radius:24px; background:var(--mat)}
+.bal{
+  position:absolute; top:0; left:0; width:var(--w); height:calc(var(--w) * 1.16);
+  border-radius:50% 50% 46% 46%; border:0; padding:0; cursor:pointer;
+  display:grid; place-items:center; font:inherit; font-weight:800; color:var(--on-color);
+  font-size:calc(var(--w) * .42); will-change:transform;
+}
+.bal::before{content:""; position:absolute; top:13%; left:17%; width:26%; height:19%; border-radius:50%; background:rgba(255,255,255,.55)}
+.bal::after{content:""; position:absolute; bottom:-8px; left:50%; margin-left:-7px; width:14px; height:11px; background:inherit; clip-path:polygon(50% 0,100% 100%,0 100%)}
+
+/* memory */
+.card3d{aspect-ratio:1; display:grid; place-items:center; font-size:clamp(28px,8.5vw,52px); border-radius:18px; max-height:26vh}
+.card3d.down{color:rgba(27,36,53,.45); font-weight:800}
+
+/* sticker book */
+.book{flex:1; min-height:0; overflow-y:auto; display:grid; gap:10px; grid-template-columns:repeat(auto-fill,minmax(68px,1fr)); align-content:start}
+.slot{aspect-ratio:1; border-radius:18px; border:3px dashed var(--line); display:grid; place-items:center; font-size:clamp(28px,7vw,40px)}
+.slot.has{border:0; background:var(--card); box-shadow:0 4px 0 var(--card-edge)}
+
+/* doodle */
+.pad{flex:1; min-height:0; width:100%; display:block; background:#fff; border-radius:24px; box-shadow:0 5px 0 var(--card-edge); touch-action:none}
+.tools{display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:center}
+.swatch{width:44px; height:44px; border-radius:50%; border:0; padding:0; cursor:pointer; box-shadow:0 4px 0 rgba(27,36,53,.28)}
+.swatch[aria-pressed="true"]{outline:4px solid var(--ink); outline-offset:3px}
+.stamp{width:44px; height:44px; border-radius:15px; font-size:24px; display:grid; place-items:center; box-shadow:0 4px 0 var(--card-edge)}
+.stamp[aria-pressed="true"]{outline:4px solid var(--ink); outline-offset:3px}
+
+/* celebration */
+#confetti{position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:50}
+.cf{position:absolute; top:-30px; width:13px; height:17px; border-radius:3px}
+@keyframes fall{to{transform:translateY(112vh) rotate(760deg)}}
+.cheer{position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:20px; background:var(--veil)}
+.cheer-card{background:var(--card); color:var(--ink); border-radius:28px; box-shadow:0 8px 0 var(--card-edge); padding:24px 20px; text-align:center; width:100%; max-width:340px}
+.cheer-card .won{font-size:84px; line-height:1}
+.cheer-card h2{margin:6px 0 2px; font-size:24px}
+.cheer-card p{margin:0 0 16px; font-size:14px; color:var(--ink-soft)}
+.cheer-card .row .chunk{min-width:78px; height:58px; font-size:26px; display:grid; place-items:center}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms !important; animation-iteration-count:1 !important}
+  .chunk{transition:none}
+}
+</style>
+
+<div id="app">
+  <header id="bar"></header>
+  <main id="stage"></main>
+</div>
+<div id="confetti" aria-hidden="true"></div>
+
+<script>
+(function(){
+"use strict";
+
+var bar = document.getElementById('bar');
+var stage = document.getElementById('stage');
+var confettiBox = document.getElementById('confetti');
+
+var STICKERS = ['🌟','🦄','🐙','🍉','🚀','🐝','🌈','🦖','🐸','🍦','🐠','🎈','🧸','🦋','🐳','🍄','🐥','🌻','🦔','🐢','🍒','🎸','🦩','🐲'];
+var HUES = ['tomato','sun','grass','grape','bubble','sky','tangerine','teal'];
+
+var GAMES = [
+  {id:'howmany',    name:'How Many?',      icon:'🔢', c:'grass',     rounds:5, kind:'learn'},
+  {id:'monster',    name:'Feed Me',        icon:'👾', c:'teal',      rounds:4, kind:'learn'},
+  {id:'more',       name:'Which Is More',  icon:'⚖️', c:'sun',     rounds:5, kind:'learn'},
+  {id:'hunt',       name:'Find It',        icon:'🔤', c:'sky',       rounds:5, kind:'learn'},
+  {id:'startswith', name:'Starts With',    icon:'👂', c:'grape',     rounds:5, kind:'learn'},
+  {id:'train',      name:'Train',          icon:'🚂', c:'tangerine', rounds:5, kind:'learn'},
+  {id:'samekind',   name:"Doesn't Belong", icon:'🧩', c:'bubble',    rounds:5, kind:'learn'},
+  {id:'balloons',   name:'Pop',            icon:'🎈', c:'tomato',    rounds:3, kind:'play'},
+  {id:'memory',     name:'Match',          icon:'🐼', c:'grape',     rounds:3, kind:'play'},
+  {id:'different',  name:'Not the Same',   icon:'🔍', c:'teal',      rounds:5, kind:'play'},
+  {id:'doodle',     name:'Doodle',         icon:'🖍️', c:'bubble', rounds:0, kind:'play'}
+];
+
+var state = {age:3, sound:true, stickers:[]};
+try{
+  var saved = localStorage.getItem('playmat');
+  if(saved){
+    var s = JSON.parse(saved);
+    if(s && (s.age===3 || s.age===5)) state.age = s.age;
+    if(s && typeof s.sound === 'boolean') state.sound = s.sound;
+    if(s && Array.isArray(s.stickers)) state.stickers = s.stickers.slice(0,60);
+  }
+}catch(e){}
+function save(){ try{ localStorage.setItem('playmat', JSON.stringify(state)); }catch(e){} }
+
+/* ---------- helpers ---------- */
+function el(tag, cls, html){
+  var n = document.createElement(tag);
+  if(cls) n.className = cls;
+  if(html != null) n.innerHTML = html;
+  return n;
+}
+function rnd(n){ return Math.floor(Math.random()*n); }
+function pick(a){ return a[rnd(a.length)]; }
+function shuffle(a){
+  for(var i=a.length-1;i>0;i--){ var j=rnd(i+1), t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+function chunk(hue, cls, html){
+  var b = el('button', 'chunk' + (cls ? ' '+cls : ''), html);
+  b.type = 'button';
+  if(hue){ b.style.setProperty('--c','var(--'+hue+')'); b.style.setProperty('--ce','var(--'+hue+'-e)'); }
+  else b.classList.add('plain');
+  return b;
+}
+function gameById(id){
+  for(var i=0;i<GAMES.length;i++) if(GAMES[i].id===id) return GAMES[i];
+  return GAMES[0];
+}
+
+/* ---------- sound: short soft tones, no files to download ---------- */
+var ac = null;
+function tone(freq, dur, type, gain){
+  if(!state.sound) return;
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return;
+    if(!ac) ac = new AC();
+    if(ac.state === 'suspended') ac.resume();
+    var o = ac.createOscillator(), g = ac.createGain();
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    o.connect(g); g.connect(ac.destination);
+    var t = ac.currentTime, peak = gain || 0.1;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(peak, t+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.start(t); o.stop(t+dur+0.03);
+  }catch(e){}
+}
+var sfx = {
+  tap:  function(){ tone(640, 0.11, 'triangle', 0.1); },
+  pop:  function(){ tone(880, 0.1, 'triangle', 0.13); setTimeout(function(){ tone(1180, 0.08, 'sine', 0.07); }, 55); },
+  good: function(){ tone(523, 0.12, 'triangle', 0.1); setTimeout(function(){ tone(784, 0.2, 'triangle', 0.1); }, 110); },
+  nope: function(){ tone(196, 0.16, 'sine', 0.07); },
+  win:  function(){ [523,659,784,1047].forEach(function(f,i){ setTimeout(function(){ tone(f, 0.22, 'triangle', 0.1); }, i*115); }); }
+};
+/* system voices are on the device, so this works with no signal */
+function say(text){
+  if(!state.sound || !text) return;
+  try{
+    if(!('speechSynthesis' in window)) return;
+    speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance(text);
+    u.rate = 0.9; u.pitch = 1.15; u.volume = 0.9;
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+
+function confetti(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for(var i=0;i<26;i++){
+    var p = el('div','cf');
+    p.style.left = rnd(100) + 'vw';
+    p.style.background = 'var(--' + HUES[rnd(HUES.length)] + ')';
+    p.style.animation = 'fall ' + (1.1 + Math.random()*0.8).toFixed(2) + 's linear ' + (Math.random()*0.35).toFixed(2) + 's forwards';
+    confettiBox.appendChild(p);
+  }
+  setTimeout(function(){ confettiBox.innerHTML = ''; }, 2600);
+}
+
+/* ---------- top bar ---------- */
+function soundButton(){
+  var b = chunk(state.sound ? 'sun' : null, 'mini', state.sound ? '🔔' : '🔇');
+  b.setAttribute('aria-label', state.sound ? 'Sound on' : 'Sound off');
+  b.onclick = function(){
+    state.sound = !state.sound;
+    save();
+    if(!state.sound){ try{ speechSynthesis.cancel(); }catch(e){} }
+    b.innerHTML = state.sound ? '🔔' : '🔇';
+    b.setAttribute('aria-label', state.sound ? 'Sound on' : 'Sound off');
+    if(state.sound){ b.style.setProperty('--c','var(--sun)'); b.style.setProperty('--ce','var(--sun-e)'); b.classList.remove('plain'); sfx.tap(); }
+    else { b.style.removeProperty('--c'); b.style.removeProperty('--ce'); b.classList.add('plain'); }
+  };
+  return b;
+}
+function homeBar(){
+  bar.innerHTML = '';
+  bar.appendChild(el('div','brand','tray table <b>playmat</b>'));
+  var seg = el('div','seg');
+  seg.appendChild(el('span','kicker','age'));
+  [3,5].forEach(function(n){
+    var p = chunk(state.age===n ? 'sun' : null, 'pill', String(n));
+    p.setAttribute('aria-pressed', state.age===n ? 'true' : 'false');
+    p.setAttribute('aria-label', 'Set up for age ' + n);
+    p.onclick = function(){ state.age = n; save(); sfx.tap(); renderHome(); };
+    seg.appendChild(p);
+  });
+  bar.appendChild(seg);
+  bar.appendChild(soundButton());
+}
+function gameBar(g, done){
+  bar.innerHTML = '';
+  var back = chunk(null,'mini','⬅️');
+  back.setAttribute('aria-label','Back to all games');
+  back.onclick = function(){ sfx.tap(); renderHome(); };
+  bar.appendChild(back);
+  bar.appendChild(el('div','gname', g.name));
+  if(g.rounds > 0){
+    var pips = el('div','pips');
+    for(var i=0;i<g.rounds;i++) pips.appendChild(el('div','pip' + (i < done ? ' on' : '')));
+    bar.appendChild(pips);
+  } else {
+    bar.appendChild(el('div','pips'));
+  }
+  bar.appendChild(soundButton());
+}
+
+/* ---------- home ---------- */
+function renderHome(){
+  try{ speechSynthesis.cancel(); }catch(e){}
+  homeBar();
+  stage.innerHTML = '';
+  var mat = el('div','mat');
+  [{k:'learn', label:'learn \u00b7 counting, letters, patterns'},
+   {k:'play',  label:'play'}].forEach(function(sec){
+    mat.appendChild(el('div','kicker', sec.label));
+    var tiles = el('div','tiles');
+    GAMES.forEach(function(g){
+      if(g.kind !== sec.k) return;
+      var b = chunk(g.c, 'tile');
+      b.appendChild(el('span','ticon', g.icon));
+      b.appendChild(el('span','tname', g.name));
+      b.onclick = function(){ sfx.tap(); runGame(g); };
+      tiles.appendChild(b);
+    });
+    if(sec.k === 'play'){
+      var book = chunk(null,'tile');
+      book.appendChild(el('span','ticon','\ud83d\udcd6'));
+      book.appendChild(el('span','tname','Stickers \u00b7 ' + state.stickers.length));
+      book.onclick = function(){ sfx.tap(); renderBook(); };
+      tiles.appendChild(book);
+    }
+    mat.appendChild(tiles);
+  });
+  stage.appendChild(mat);
+  stage.appendChild(el('p','hint-line','Tap the picture at the top of a game to hear it again.'));
+}
+
+/* ---------- sticker book ---------- */
+function renderBook(){
+  bar.innerHTML = '';
+  var back = chunk(null,'mini','⬅️');
+  back.setAttribute('aria-label','Back to all games');
+  back.onclick = function(){ sfx.tap(); renderHome(); };
+  bar.appendChild(back);
+  bar.appendChild(el('div','gname','Sticker Book'));
+  bar.appendChild(el('div','pips'));
+  bar.appendChild(soundButton());
+  stage.innerHTML = '';
+  var book = el('div','book');
+  for(var i=0;i<24;i++){
+    var has = state.stickers[i];
+    book.appendChild(el('div','slot' + (has ? ' has' : ''), has || ''));
+  }
+  stage.appendChild(book);
+  stage.appendChild(el('p','hint-line', state.stickers.length ? 'Finish a game to win another sticker.' : 'Win a sticker by finishing any game.'));
+}
+
+function earnSticker(){
+  var left = STICKERS.filter(function(s){ return state.stickers.indexOf(s) < 0; });
+  var s = left.length ? pick(left) : pick(STICKERS);
+  state.stickers.push(s);
+  if(state.stickers.length > 24) state.stickers.shift();
+  save();
+  return s;
+}
+
+/* ---------- game shell ---------- */
+var BUILD = {};
+var liveRaf = 0;
+
+function runGame(g){
+  if(liveRaf){ cancelAnimationFrame(liveRaf); liveRaf = 0; }
+  try{ speechSynthesis.cancel(); }catch(e){}
+  var done = 0, lastSpeech = '';
+  gameBar(g, 0);
+  stage.innerHTML = '';
+  var promptEl = el('div','prompt');
+  var playEl = el('div','play');
+  if(g.rounds > 0){
+    promptEl.onclick = function(){ say(lastSpeech); };
+    stage.appendChild(promptEl);
+  }
+  stage.appendChild(playEl);
+
+  var api = {
+    play: playEl,
+    promptEl: promptEl,
+    prompt: function(html, speech){
+      promptEl.className = 'prompt';
+      promptEl.innerHTML = html;
+      lastSpeech = speech || '';
+      say(lastSpeech);
+    },
+    promptHTML: function(html){ promptEl.innerHTML = html; },
+    nope: function(node){
+      sfx.nope();
+      node.classList.remove('wob');
+      void node.offsetWidth;
+      node.classList.add('wob');
+    },
+    /* true means the whole game is finished, so don't start another round */
+    score: function(){
+      done++;
+      gameBar(g, done);
+      if(done >= g.rounds){ setTimeout(function(){ celebrate(g); }, 520); return true; }
+      sfx.good();
+      return false;
+    },
+    raf: function(id){ liveRaf = id; }
+  };
+  BUILD[g.id](api, g);
+}
+
+function celebrate(g){
+  sfx.win();
+  confetti();
+  var s = earnSticker();
+  say('You did it!');
+  var overlay = el('div','cheer');
+  var card = el('div','cheer-card');
+  card.appendChild(el('div','won', s));
+  card.appendChild(el('h2', null, 'You did it!'));
+  card.appendChild(el('p', null, 'This sticker is yours.'));
+  var row = el('div','row');
+  var again = chunk(g.c, null, '🔄');
+  again.setAttribute('aria-label','Play again');
+  again.onclick = function(){ sfx.tap(); overlay.remove(); runGame(g); };
+  var book = chunk('sun', null, '📖');
+  book.setAttribute('aria-label','Sticker book');
+  book.onclick = function(){ sfx.tap(); overlay.remove(); renderBook(); };
+  var home = chunk(null, null, '🏠');
+  home.setAttribute('aria-label','All games');
+  home.onclick = function(){ sfx.tap(); overlay.remove(); renderHome(); };
+  row.appendChild(again); row.appendChild(book); row.appendChild(home);
+  card.appendChild(row);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
+function centred(grid, cols, cell){
+  grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
+  grid.style.maxWidth = (cols * cell) + 'px';
+  grid.style.margin = '0 auto';
+  return grid;
+}
+
+/* ---------- 1. balloon pop: tap counting, then counting in order ---------- */
+BUILD.balloons = function(api){
+  var ordered = state.age === 5;
+  var n = ordered ? 8 : 4;
+  var w = ordered ? 60 : 88;
+  api.play.className = 'play fill';
+  var sky = el('div','sky');
+  api.play.appendChild(sky);
+  var bals = [], want = 1, raf = 0, last = 0;
+
+  function ask(){
+    if(ordered) api.prompt('<span class="num">' + want + '</span><span class="ptext">pop this number</span>', 'Pop number ' + want);
+    else api.prompt('<span class="big">🎈</span><span class="ptext">pop them all</span>', 'Pop all the balloons');
+  }
+  function make(i){
+    var b = el('button','bal');
+    b.type = 'button';
+    b.style.setProperty('--w', w + 'px');
+    b.style.background = 'var(--' + HUES[i % HUES.length] + ')';
+    b.style.left = 'calc(8px + ' + (((i + 0.5) / n).toFixed(3)) + ' * (100% - ' + (16 + w) + 'px))';
+    if(ordered) b.textContent = String(i + 1);
+    b.setAttribute('aria-label', ordered ? ('Balloon ' + (i + 1)) : 'Balloon');
+    var o = {el:b, num:i+1, y:0, vy:(ordered ? 30 : 20) + Math.random()*12, ph:Math.random()*6.283, popped:false};
+    b.onclick = function(){
+      if(o.popped) return;
+      if(ordered && o.num !== want){ api.nope(b); return; }
+      o.popped = true;
+      b.classList.add('gone');
+      sfx.pop();
+      if(ordered){ want++; if(want <= n) ask(); }
+      var left = 0;
+      for(var k=0;k<bals.length;k++) if(!bals[k].popped) left++;
+      if(left === 0){
+        cancelAnimationFrame(raf);
+        if(!api.score()) setTimeout(round, 750);
+      }
+    };
+    sky.appendChild(b);
+    return o;
+  }
+  function frame(t){
+    if(!sky.isConnected){ cancelAnimationFrame(raf); return; }
+    var dt = Math.min(0.05, (t - (last || t)) / 1000);
+    last = t;
+    for(var i=0;i<bals.length;i++){
+      var o = bals[i];
+      if(o.popped) continue;
+      o.y -= o.vy * dt;
+      if(o.y < 6) o.y = 6;            /* balloons rest on the ceiling, they never escape */
+      o.ph += dt * 1.4;
+      o.el.style.transform = 'translate3d(' + (Math.sin(o.ph) * 11).toFixed(1) + 'px,' + o.y.toFixed(1) + 'px,0)';
+    }
+    raf = requestAnimationFrame(frame);
+    api.raf(raf);
+  }
+  function round(){
+    if(!api.play.isConnected) return;
+    cancelAnimationFrame(raf);
+    sky.innerHTML = '';
+    bals = [];
+    want = 1;
+    ask();
+    for(var i=0;i<n;i++) bals.push(make(i));
+    requestAnimationFrame(function(){
+      var H = sky.clientHeight || 320;
+      var gap = (H * 1.15) / n;       /* most of them are already in the sky */
+      for(var k=0;k<bals.length;k++) bals[k].y = H * 0.1 + k * gap;
+      last = 0;
+      raf = requestAnimationFrame(frame);
+      api.raf(raf);
+    });
+  }
+  round();
+};
+
+/* ---------- 2. memory match ---------- */
+BUILD.memory = function(api){
+  var pairs = state.age === 5 ? 6 : 3;
+  var cols = state.age === 5 ? 4 : 3;
+  var pool = ['🐸','🦊','🐼','🦉','🐙','🐝','🦋','🐞','🐳','🦄'];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    api.prompt('<span class="big">🐼</span><span class="ptext">find the pairs</span>', 'Find the pairs');
+    var picks = shuffle(pool.slice()).slice(0, pairs);
+    var cards = shuffle(picks.concat(picks));
+    var grid = centred(el('div','grid'), cols, 118);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var open = [], lock = false, found = 0;
+
+    cards.forEach(function(sym){
+      var b = chunk('sky','card3d down','?');
+      b.setAttribute('aria-label','Card');
+      var faceUp = false, matched = false;
+      function cover(){
+        faceUp = false;
+        b.innerHTML = '?';
+        b.classList.add('down');
+        b.classList.remove('plain');
+        b.style.setProperty('--c','var(--sky)');
+        b.style.setProperty('--ce','var(--sky-e)');
+      }
+      function keep(){
+        matched = true;
+        b.classList.remove('plain');
+        b.style.setProperty('--c','var(--grass)');
+        b.style.setProperty('--ce','var(--grass-e)');
+      }
+      b.onclick = function(){
+        if(lock || faceUp || matched) return;
+        faceUp = true;
+        b.classList.remove('down');
+        b.classList.add('plain');
+        b.style.setProperty('--c','var(--card)');
+        b.style.setProperty('--ce','var(--card-edge)');
+        b.innerHTML = sym;
+        sfx.tap();
+        open.push({sym:sym, cover:cover, keep:keep});
+        if(open.length === 2){
+          lock = true;
+          var pairUp = open[0].sym === open[1].sym;
+          setTimeout(function(){
+            if(pairUp){
+              open.forEach(function(o){ o.keep(); });
+              found++;
+              sfx.pop();
+            } else {
+              open.forEach(function(o){ o.cover(); });
+            }
+            open = [];
+            lock = false;
+            if(pairUp && found === pairs){ if(!api.score()) setTimeout(round, 850); }
+          }, pairUp ? 350 : 950);
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- 3. not the same ---------- */
+BUILD.different = function(api){
+  var EASY = [['🐶','🚌'],['🍎','🐳'],['⭐','🍔'],['🚗','🐸'],['🌸','🚀'],['🐱','🍕'],['🐥','⚽']];
+  var HARD = [['🍎','🍏'],['⭐','🌟'],['🐻','🐨'],['🚗','🚙'],['🔵','🟣'],['😀','😃'],['🌞','🌝'],['🐸','🐢'],['🌲','🌳']];
+  var count = state.age === 5 ? 6 : 3;
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    api.prompt('<span class="big">🔍</span><span class="ptext">tap the one that is different</span>', 'Tap the one that is different');
+    var set = pick(state.age === 5 ? HARD : EASY);
+    var items = [];
+    for(var i=0;i<count-1;i++) items.push({sym:set[0], odd:false});
+    items.push({sym:set[1], odd:true});
+    shuffle(items);
+    var grid = centred(el('div','grid'), 3, 130);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var finished = false, wrong = 0, oddBtn = null;
+
+    items.forEach(function(it){
+      var b = chunk(null,'opt', it.sym);
+      b.setAttribute('aria-label','Picture');
+      if(it.odd) oddBtn = b;
+      b.onclick = function(){
+        if(finished) return;
+        if(it.odd){
+          finished = true;
+          b.classList.add('gone');
+          sfx.pop();
+          if(!api.score()) setTimeout(round, 750);
+        } else {
+          wrong++;
+          api.nope(b);
+          if(wrong >= 2 && oddBtn) oddBtn.classList.add('bob');
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- 4. feed me: counting at 3, adding at 5 ---------- */
+BUILD.monster = function(api){
+  if(state.age === 5) return adding(api);
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var n = 1 + rnd(5), fed = 0, finished = false;
+    function face(){
+      var dots = '';
+      for(var i=0;i<n;i++) dots += '<span class="dot' + (i < fed ? ' on' : '') + '"></span>';
+      return '<span class="big">' + (fed >= n ? '😋' : '👾') + '</span><span class="num">' + n + '</span><span class="dots">' + dots + '</span>';
+    }
+    api.prompt(face(), 'Feed me ' + n + (n === 1 ? ' cookie' : ' cookies'));
+    var tray = centred(el('div','grid'), 3, 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(tray);
+    for(var i=0;i<6;i++){
+      (function(){
+        var b = chunk('sun','opt','🍪');
+        b.setAttribute('aria-label','Cookie');
+        var used = false;
+        b.onclick = function(){
+          if(finished || used || fed >= n) return;
+          used = true;
+          fed++;
+          b.classList.add('gone');
+          sfx.pop();
+          api.promptHTML(face());
+          if(fed === n){
+            finished = true;
+            if(!api.score()) setTimeout(round, 950);
+          }
+        };
+        tray.appendChild(b);
+      })();
+    }
+  }
+  round();
+};
+
+function adding(api){
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var a = 1 + rnd(5), b2 = 1 + rnd(5), sum = a + b2;
+    var ca = '', cb = '', i;
+    for(i=0;i<a;i++) ca += '🍪';
+    for(i=0;i<b2;i++) cb += '🍪';
+    api.prompt('<span class="big">👾</span><span class="ptext" style="font-size:21px">' + ca + ' + ' + cb + ' = ?</span>',
+      'How many cookies? ' + a + ' plus ' + b2);
+    var opts = [sum];
+    while(opts.length < 3){
+      var cand = Math.max(1, sum + (rnd(5) - 2));
+      if(opts.indexOf(cand) < 0) opts.push(cand);
+    }
+    shuffle(opts);
+    var row = centred(el('div','grid'), 3, 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(row);
+    var finished = false;
+    opts.forEach(function(v){
+      var b = chunk('grass','opt numeric', String(v));
+      b.setAttribute('aria-label', String(v));
+      b.onclick = function(){
+        if(finished) return;
+        if(v === sum){
+          finished = true;
+          sfx.pop();
+          api.promptHTML('<span class="big">😋</span><span class="num">' + sum + '</span>');
+          if(!api.score()) setTimeout(round, 950);
+        } else api.nope(b);
+      };
+      row.appendChild(b);
+    });
+  }
+  round();
+}
+
+/* ---------- 5. find it: shapes and colours at 3, letters and numbers at 5 ---------- */
+BUILD.hunt = function(api){
+  var SHAPES = ['🔴','🔵','🟡','🟢','🟣','🟠','🟥','🟦','🟨','🟩','⭐','❤️','⬛','🔺'];
+  var NAMES = {'🔴':'red circle','🔵':'blue circle','🟡':'yellow circle','🟢':'green circle','🟣':'purple circle','🟠':'orange circle','🟥':'red square','🟦':'blue square','🟨':'yellow square','🟩':'green square','⭐':'star','❤️':'heart','⬛':'black square','🔺':'triangle'};
+  var LETTERS = 'ABCDEFGHJKLMNPRSTUW'.split('');
+  var NUMS = '123456789'.split('');
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var big = state.age === 5;
+    var numbers = big && Math.random() < 0.3;
+    var pool = big ? (numbers ? NUMS : LETTERS) : SHAPES;
+    var count = big ? 8 : 6;
+    var cols = big ? 4 : 3;
+    var set = shuffle(pool.slice()).slice(0, count);
+    var target = pick(set);
+    api.prompt('<span class="' + (big ? 'num' : 'big') + '">' + target + '</span><span class="ptext">find this one</span>',
+      big ? ('Find the ' + (numbers ? 'number ' : 'letter ') + target) : ('Find the ' + (NAMES[target] || 'match')));
+    var grid = centred(el('div','grid'), cols, big ? 100 : 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var finished = false, wrong = 0, right = null;
+
+    set.forEach(function(sym){
+      var b = chunk(null,'opt' + (big ? ' numeric' : ''), sym);
+      b.setAttribute('aria-label', big ? sym : (NAMES[sym] || 'Picture'));
+      if(sym === target) right = b;
+      b.onclick = function(){
+        if(finished) return;
+        if(sym === target){
+          finished = true;
+          b.classList.add('gone');
+          sfx.pop();
+          if(!api.score()) setTimeout(round, 750);
+        } else {
+          wrong++;
+          api.nope(b);
+          if(wrong >= 2 && right) right.classList.add('bob');
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- 6. pattern train ---------- */
+BUILD.train = function(api){
+  var CARGO = ['🍎','⭐','🐸','🚗','🌸','🐝','🍋','🐟','🎩','🌙','🍄','🐠'];
+
+  function seq(){
+    var c = shuffle(CARGO.slice());
+    var A = c[0], B = c[1], C = c[2];
+    if(state.age !== 5) return {cells:[A,B,A,B], answer:A, options:[A,B,C]};
+    var kind = rnd(3);
+    if(kind === 0) return {cells:[A,A,B,B,A,A], answer:B, options:[A,B,C]};
+    if(kind === 1) return {cells:[A,B,C,A,B], answer:C, options:[A,B,C]};
+    return {cells:[A,B,B,A,B], answer:B, options:[A,B,C]};
+  }
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var s = seq();
+    var html = '<span class="big">🚂</span>';
+    s.cells.forEach(function(c){ html += '<span class="car">' + c + '</span>'; });
+    html += '<span class="car q bob">?</span>';
+    api.prompt(html, 'What comes next?');
+    api.promptEl.className = 'prompt train';
+    var row = centred(el('div','grid'), 3, 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(row);
+    var finished = false;
+    shuffle(s.options.slice()).forEach(function(v){
+      var b = chunk('tangerine','opt', v);
+      b.setAttribute('aria-label','Wagon');
+      b.onclick = function(){
+        if(finished) return;
+        if(v === s.answer){
+          finished = true;
+          sfx.pop();
+          api.promptHTML(html.replace('<span class="car q bob">?</span>', '<span class="car">' + v + '</span>'));
+          if(!api.score()) setTimeout(round, 900);
+        } else api.nope(b);
+      };
+      row.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- 7. doodle pad: no rules, no end ---------- */
+BUILD.doodle = function(api){
+  api.play.className = 'play fill';
+  api.play.style.display = 'flex';
+  api.play.style.flexDirection = 'column';
+  api.play.style.gap = '10px';
+  var cv = el('canvas','pad');
+  var tools = el('div','tools');
+  api.play.innerHTML = '';
+  api.play.appendChild(cv);
+  api.play.appendChild(tools);
+  var g2 = cv.getContext('2d');
+  var COLS = ['#1B2435','#F4634E','#FF9F52','#FFC031','#4CC483','#2E86B8','#A186E4','#FF93C6'];
+  var colour = COLS[1], stamp = null, drawing = false, lx = 0, ly = 0;
+
+  function fit(){
+    var r = cv.getBoundingClientRect();
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+    if(cv.width === w && cv.height === h) return;
+    var old = null;
+    if(cv.width > 1 && cv.height > 1){
+      old = document.createElement('canvas');
+      old.width = cv.width; old.height = cv.height;
+      old.getContext('2d').drawImage(cv, 0, 0);
+    }
+    cv.width = w; cv.height = h;
+    g2.fillStyle = '#fff';
+    g2.fillRect(0, 0, w, h);
+    if(old) g2.drawImage(old, 0, 0, w, h);
+    g2.lineCap = 'round';
+    g2.lineJoin = 'round';
+  }
+  requestAnimationFrame(fit);
+  window.addEventListener('resize', function(){ if(cv.isConnected) fit(); });
+
+  function at(e){
+    var r = cv.getBoundingClientRect();
+    return {x:(e.clientX - r.left) * (cv.width / r.width), y:(e.clientY - r.top) * (cv.height / r.height)};
+  }
+  cv.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    var p = at(e);
+    if(stamp){
+      g2.font = Math.round(cv.width * 0.11) + 'px serif';
+      g2.textAlign = 'center';
+      g2.textBaseline = 'middle';
+      g2.fillText(stamp, p.x, p.y);
+      sfx.pop();
+      return;
+    }
+    drawing = true; lx = p.x; ly = p.y;
+    try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    g2.strokeStyle = colour;
+    g2.lineWidth = Math.max(7, cv.width * 0.022);
+    g2.beginPath();
+    g2.moveTo(p.x, p.y);
+    g2.lineTo(p.x + 0.1, p.y);
+    g2.stroke();
+  });
+  cv.addEventListener('pointermove', function(e){
+    if(!drawing) return;
+    e.preventDefault();
+    var p = at(e);
+    g2.beginPath();
+    g2.moveTo(lx, ly);
+    g2.lineTo(p.x, p.y);
+    g2.stroke();
+    lx = p.x; ly = p.y;
+  });
+  function stop(){ drawing = false; }
+  cv.addEventListener('pointerup', stop);
+  cv.addEventListener('pointercancel', stop);
+
+  function clearPressed(){
+    var all = tools.querySelectorAll('[aria-pressed]');
+    for(var i=0;i<all.length;i++) all[i].setAttribute('aria-pressed','false');
+  }
+  COLS.forEach(function(c){
+    var s = el('button','swatch');
+    s.type = 'button';
+    s.style.background = c;
+    s.setAttribute('aria-label','Crayon');
+    s.setAttribute('aria-pressed', c === colour ? 'true' : 'false');
+    s.onclick = function(){ colour = c; stamp = null; clearPressed(); s.setAttribute('aria-pressed','true'); sfx.tap(); };
+    tools.appendChild(s);
+  });
+  ['⭐','❤️','🌈'].forEach(function(em){
+    var b = chunk(null,'stamp', em);
+    b.setAttribute('aria-label','Stamp');
+    b.setAttribute('aria-pressed','false');
+    b.onclick = function(){ stamp = em; clearPressed(); b.setAttribute('aria-pressed','true'); sfx.tap(); };
+    tools.appendChild(b);
+  });
+  var wipe = chunk('tomato','stamp','🧽');
+  wipe.setAttribute('aria-label','Start a clean page');
+  wipe.onclick = function(){ g2.fillStyle = '#fff'; g2.fillRect(0, 0, cv.width, cv.height); sfx.tap(); };
+  tools.appendChild(wipe);
+};
+
+/* ---------- 8. how many? count the things, tap the numeral ---------- */
+BUILD.howmany = function(api){
+  var THINGS = ['🐟','🍓','🐥','🦋','🚗','⭐','🍎','🐸','🌸','🐞','🍪','🐠'];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var big = state.age === 5;
+    var n = big ? (3 + rnd(8)) : (1 + rnd(3));
+    var thing = pick(THINGS);
+    var html = '';
+    for(var i=0;i<n;i++) html += '<span class="count-item">' + thing + '</span>';
+    api.prompt(html, 'How many?');
+    var opts = [n];
+    if(big){
+      var near = [n-2, n-1, n+1, n+2].filter(function(v){ return v >= 1 && v <= 10; });
+      shuffle(near);
+      while(opts.length < 3 && near.length){
+        var c = near.pop();
+        if(opts.indexOf(c) < 0) opts.push(c);
+      }
+    } else opts = [1,2,3];
+    shuffle(opts);
+    var row = centred(el('div','grid'), 3, 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(row);
+    var finished = false;
+    opts.forEach(function(v){
+      var b = chunk('grass','opt numeric', String(v));
+      b.setAttribute('aria-label', String(v));
+      b.onclick = function(){
+        if(finished) return;
+        if(v === n){
+          finished = true;
+          sfx.pop();
+          say(String(n));
+          if(!api.score()) setTimeout(round, 1000);
+        } else api.nope(b);
+      };
+      row.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- 9. which is more: comparing amounts ---------- */
+BUILD.more = function(api){
+  var THINGS = ['🍓','🐟','⭐','🍪','🐥','🌸','🍎','🐞'];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    api.prompt('<span class="big">⚖️</span><span class="ptext">tap the side with more</span>', 'Tap the side with more');
+    var thing = pick(THINGS);
+    var a, b;
+    if(state.age === 5){
+      a = 2 + rnd(7);
+      b = a + (Math.random() < 0.5 ? -1 : 1) * (1 + rnd(2));
+      if(b < 1) b = a + 2;
+      if(b === a) b = a + 1;
+    } else {
+      a = 1 + rnd(2);
+      b = 4 + rnd(3);
+      if(Math.random() < 0.5){ var t = a; a = b; b = t; }
+    }
+    var most = Math.max(a, b), least = Math.min(a, b);
+    var grid = centred(el('div','grid'), 2, 190);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var finished = false;
+    [a, b].forEach(function(count){
+      var fill = '';
+      for(var i=0;i<count;i++) fill += thing;
+      var pn = chunk(null,'panel', fill);
+      pn.setAttribute('aria-label', count + ' of them');
+      pn.onclick = function(){
+        if(finished) return;
+        if(count === most){
+          finished = true;
+          sfx.pop();
+          api.promptHTML('<span class="num">' + most + '</span><span class="ptext">is more than</span><span class="num">' + least + '</span>');
+          say(most + ' is more than ' + least);
+          if(!api.score()) setTimeout(round, 1300);
+        } else api.nope(pn);
+      };
+      grid.appendChild(pn);
+    });
+  }
+  round();
+};
+
+/* ---------- 10. starts with: hearing words at 3, first letters at 5 ---------- */
+BUILD.startswith = function(api){
+  var WORDS = [
+    {e:'🍎', w:'apple', l:'A'},     {e:'⚽', w:'ball', l:'B'},
+    {e:'🐱', w:'cat', l:'C'},       {e:'🐶', w:'dog', l:'D'},
+    {e:'🐘', w:'elephant', l:'E'},  {e:'🐟', w:'fish', l:'F'},
+    {e:'🍇', w:'grapes', l:'G'},    {e:'🎩', w:'hat', l:'H'},
+    {e:'🔑', w:'key', l:'K'},       {e:'🦁', w:'lion', l:'L'},
+    {e:'🌙', w:'moon', l:'M'},      {e:'👃', w:'nose', l:'N'},
+    {e:'🐷', w:'pig', l:'P'},       {e:'🚀', w:'rocket', l:'R'},
+    {e:'☀️', w:'sun', l:'S'},     {e:'🌳', w:'tree', l:'T'},
+    {e:'☂️', w:'umbrella', l:'U'},{e:'🐳', w:'whale', l:'W'},
+    {e:'🦓', w:'zebra', l:'Z'}
+  ];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var big = state.age === 5;
+    var set = shuffle(WORDS.slice()).slice(0, 3);   /* every entry has a different first letter */
+    var target = pick(set);
+    if(big) api.prompt('<span class="num">' + target.l + '</span><span class="ptext">which one starts with this letter?</span>', 'Which one starts with ' + target.l + '?');
+    else api.prompt('<span class="big">👂</span><span class="ptext">' + target.w + '</span>', 'Find the ' + target.w);
+    var row = centred(el('div','grid'), 3, 130);
+    api.play.innerHTML = '';
+    api.play.appendChild(row);
+    var finished = false, wrong = 0, right = null;
+    set.forEach(function(it){
+      var b = chunk(null,'opt', it.e);
+      b.setAttribute('aria-label', it.w);
+      if(it === target) right = b;
+      b.onclick = function(){
+        if(finished) return;
+        if(it === target){
+          finished = true;
+          sfx.pop();
+          say(big ? (target.l + ' is for ' + target.w) : target.w);
+          if(!api.score()) setTimeout(round, 1300);
+        } else {
+          wrong++;
+          api.nope(b);
+          if(wrong >= 2 && right) right.classList.add('bob');
+        }
+      };
+      row.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- 11. doesn't belong: sorting by category ---------- */
+BUILD.samekind = function(api){
+  var KINDS = {
+    animals:  ['🐶','🐱','🐼','🦊','🐸','🐥','🐝','🦁','🐳','🐰'],
+    food:     ['🍎','🍌','🍪','🍕','🍓','🥕','🍇','🧁','🍋','🌽'],
+    vehicles: ['🚗','🚌','🚂','✈️','🚲','🚜','🚓','⛵','🚁','🛵'],
+    clothes:  ['🎩','👟','🧦','👕','🧢','🧣','👗','🥾']
+  };
+  var KEYS = ['animals','food','vehicles','clothes'];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    api.prompt('<span class="big">🧩</span><span class="ptext">tap the one that does not belong</span>', 'Tap the one that does not belong');
+    var two = shuffle(KEYS.slice());
+    var count = state.age === 5 ? 4 : 3;
+    var main = shuffle(KINDS[two[0]].slice()).slice(0, count - 1);
+    var items = main.map(function(sym){ return {sym:sym, odd:false}; });
+    items.push({sym:pick(KINDS[two[1]]), odd:true});
+    shuffle(items);
+    var grid = centred(el('div','grid'), count, count === 4 ? 100 : 120);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var finished = false, wrong = 0, oddBtn = null;
+    items.forEach(function(it){
+      var b = chunk(null,'opt', it.sym);
+      b.setAttribute('aria-label','Picture');
+      if(it.odd) oddBtn = b;
+      b.onclick = function(){
+        if(finished) return;
+        if(it.odd){
+          finished = true;
+          b.classList.add('gone');
+          sfx.pop();
+          if(!api.score()) setTimeout(round, 800);
+        } else {
+          wrong++;
+          api.nope(b);
+          if(wrong >= 2 && oddBtn) oddBtn.classList.add('bob');
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- boot ---------- */
+document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+document.addEventListener('pointerdown', function unlock(){
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(AC){ if(!ac) ac = new AC(); if(ac.state === 'suspended') ac.resume(); }
+  }catch(e){}
+  document.removeEventListener('pointerdown', unlock, true);
+}, true);
+
+var booted = false;
+function boot(data){
+  if(booted) return;
+  booted = true;
+  if(data && (data.age === 3 || data.age === 5)) state.age = data.age;
+  renderHome();
+}
+try{
+  if(window.claude && window.claude.hot){
+    if(window.claude.hot.snapshot) window.claude.hot.snapshot(function(){ return {age:state.age}; });
+    if(window.claude.hot.ready) window.claude.hot.ready(boot);
+    else boot(window.claude.hot.data || {});
+  } else boot({});
+}catch(e){ boot({}); }
+})();
+</script>
+
+<style>
+.car{display:grid; place-items:center; width:clamp(36px,10.5vw,52px); height:clamp(36px,10.5vw,52px); border-radius:12px; background:var(--mat); color:var(--ink); font-size:clamp(21px,6vw,30px)}
+.car.q{background:var(--sun); color:var(--on-color); font-weight:800}
+.prompt.train{gap:6px}
+.mat{display:flex; flex-direction:column; gap:8px}
+.mat .kicker{padding:7px 2px 0}
+.tiles{display:grid; gap:12px; grid-template-columns:repeat(2,1fr)}
+@media (min-width:520px){.tiles{grid-template-columns:repeat(3,1fr)}}
+.tile{min-height:104px}
+.count-item{font-size:clamp(25px,6.5vw,36px); line-height:1}
+.panel{min-height:132px; padding:12px 10px; border-radius:20px; display:flex; flex-wrap:wrap; gap:5px; align-content:center; justify-content:center; font-size:clamp(19px,5vw,28px); line-height:1.15}
+</style>
+
+<script>
+/* the service worker is what makes this work in airplane mode */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+</script>
+</body>
+</html>
