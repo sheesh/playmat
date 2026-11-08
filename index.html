@@ -28,28 +28,30 @@ img{max-width:100%}
 <body>
 <style>
 :root{
-  --paper:#F2FAFD; --mat:#D7EDF8; --card:#FFFFFF; --card-edge:#C2DDEB;
+  --paper:#F0FBFF; --mat:#CCEDFC; --card:#FFFFFF; --card-edge:#C2DDEB;
   --ink:#223049; --ink-soft:#5E7290; --line:#B9D7E6; --pip-off:#BFD9E7;
   --on-color:#1B2435;
   --veil:rgba(34,48,73,.45);
-  --tomato:#F4634E; --tomato-e:#C3432F;
-  --sun:#FFC031;    --sun-e:#D1911A;
-  --grass:#4CC483;  --grass-e:#2A8D57;
-  --grape:#A186E4;  --grape-e:#6E52B5;
-  --bubble:#FF93C6; --bubble-e:#D1619B;
-  --sky:#5DB9E8;    --sky-e:#2E86B8;
-  --tangerine:#FF9F52; --tangerine-e:#D16F24;
-  --teal:#4FCFC0;   --teal-e:#2A9C90;
+  /* Bright toy colours. Every one of them carries --on-color (dark ink)
+     at well over 4.5:1, because nothing here is ever white-on-a-colour. */
+  --tomato:#FF5A47; --tomato-e:#D1382A;
+  --sun:#FFCC1A;    --sun-e:#D9A000;
+  --grass:#35DC7C;  --grass-e:#1BA355;
+  --grape:#B37DFF;  --grape-e:#7B42DE;
+  --bubble:#FF7ACB; --bubble-e:#D94BA2;
+  --sky:#3FC6FF;    --sky-e:#1A8ECC;
+  --tangerine:#FFA030; --tangerine-e:#D97413;
+  --teal:#2BE3CA;   --teal-e:#12A994;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --paper:#131A27; --mat:#1E2737; --card:#29344A; --card-edge:#141C29;
+    --paper:#121B2B; --mat:#1F2C40; --card:#29344A; --card-edge:#141C29;
     --ink:#F0F5FB; --ink-soft:#A4B5CD; --line:#3C4A63; --pip-off:#44536E;
     --veil:rgba(8,12,20,.6);
   }
 }
 :root[data-theme="dark"]{
-  --paper:#131A27; --mat:#1E2737; --card:#29344A; --card-edge:#141C29;
+  --paper:#121B2B; --mat:#1F2C40; --card:#29344A; --card-edge:#141C29;
   --ink:#F0F5FB; --ink-soft:#A4B5CD; --line:#3C4A63; --pip-off:#44536E;
   --veil:rgba(8,12,20,.6);
 }
@@ -440,12 +442,20 @@ function renderBook(){
   bar.appendChild(el('div','pips'));
   bar.appendChild(soundButton());
   stage.innerHTML = '';
-  var book = el('div','book');
+  var mine = book();
+  var grid = el('div','book');
   for(var i=0;i<24;i++){
-    var has = book()[i];
-    book.appendChild(el('div','slot' + (has ? ' has' : ''), has || ''));
+    var has = mine[i];
+    var slot = el('div','slot' + (has ? ' has' : ''), has || '');
+    if(has){
+      /* every sticker gets its own bright card, so the book looks like a book */
+      var hue = HUES[i % HUES.length];
+      slot.style.background = 'var(--' + hue + ')';
+      slot.style.boxShadow = '0 5px 0 var(--' + hue + '-e)';
+    }
+    grid.appendChild(slot);
   }
-  stage.appendChild(book);
+  stage.appendChild(grid);
   stage.appendChild(el('p','hint-line', book().length ? 'Finish a game to win another sticker.' : 'Win a sticker by finishing any game.'));
 }
 
@@ -1075,6 +1085,101 @@ var ART = [
     c.beginPath(); c.arc(cx, H*0.26, u*0.12, 0, 6.283); c.stroke();
     c.beginPath(); c.arc(cx, H*0.12, u*0.035, 0, 6.283); c.stroke();
   }
+  ,
+  /* Six creatures of our own. Same spirit as the collecting-monster games —
+     round bodies, big eyes, silly tails — but nobody else's characters. */
+  function(c, W, H){                                  /* Sparkbug */
+    var cx = W*0.44, cy = H*0.56, u = Math.min(W,H), r = u*0.19;
+    for(var s=-1;s<=1;s+=2){
+      c.beginPath(); c.ellipse(cx+s*r*0.55, cy-r*1.3, r*0.17, r*0.56, s*0.35, 0, 6.283); c.stroke();
+    }
+    c.beginPath(); c.arc(cx, cy, r, 0, 6.283); c.stroke();
+    for(var a=-1;a<=1;a+=2){ c.beginPath(); c.arc(cx+a*r*0.36, cy-r*0.14, r*0.13, 0, 6.283); c.stroke(); }
+    for(var b=-1;b<=1;b+=2){ c.beginPath(); c.arc(cx+b*r*0.72, cy+r*0.24, r*0.14, 0, 6.283); c.stroke(); }
+    c.beginPath(); c.arc(cx, cy+r*0.2, r*0.24, 0.25, Math.PI-0.25); c.stroke();
+    c.beginPath();
+    c.moveTo(cx+r*0.95, cy+r*0.12); c.lineTo(cx+r*1.5, cy-r*0.32); c.lineTo(cx+r*1.24, cy-r*0.38);
+    c.lineTo(cx+r*1.82, cy-r*0.98); c.lineTo(cx+r*1.5, cy-r*0.2); c.lineTo(cx+r*1.72, cy-r*0.14);
+    c.lineTo(cx+r*1.05, cy+r*0.42); c.closePath(); c.stroke();
+    for(var f=-1;f<=1;f+=2){ c.beginPath(); c.ellipse(cx+f*r*0.45, cy+r*1.03, r*0.27, r*0.14, 0,0,6.283); c.stroke(); }
+  },
+  function(c, W, H){                                  /* Flameling */
+    var cx = W*0.44, cy = H*0.56, u = Math.min(W,H);
+    c.beginPath(); c.ellipse(cx, cy, u*0.17, u*0.21, 0,0,6.283); c.stroke();
+    c.beginPath(); c.arc(cx, cy-u*0.27, u*0.15, 0, 6.283); c.stroke();
+    for(var s=-1;s<=1;s+=2){
+      c.beginPath(); c.moveTo(cx+s*u*0.085, cy-u*0.38); c.lineTo(cx+s*u*0.15, cy-u*0.51);
+      c.lineTo(cx+s*u*0.02, cy-u*0.42); c.closePath(); c.stroke();
+    }
+    for(var e=-1;e<=1;e+=2){ c.beginPath(); c.arc(cx+e*u*0.06, cy-u*0.29, u*0.028, 0,6.283); c.stroke(); }
+    c.beginPath(); c.ellipse(cx, cy+u*0.03, u*0.09, u*0.12, 0,0,6.283); c.stroke();
+    for(var w=-1;w<=1;w+=2){
+      c.beginPath(); c.moveTo(cx+w*u*0.15, cy-u*0.07);
+      c.quadraticCurveTo(cx+w*u*0.37, cy-u*0.23, cx+w*u*0.3, cy+u*0.06); c.closePath(); c.stroke();
+    }
+    for(var g=-1;g<=1;g+=2){ c.beginPath(); c.ellipse(cx+g*u*0.09, cy+u*0.22, u*0.07, u*0.04,0,0,6.283); c.stroke(); }
+    c.beginPath(); c.moveTo(cx+u*0.16, cy+u*0.1);
+    c.quadraticCurveTo(cx+u*0.4, cy+u*0.13, cx+u*0.35, cy-u*0.13);
+    c.quadraticCurveTo(cx+u*0.3, cy+u*0.03, cx+u*0.22, cy+u*0.05); c.closePath(); c.stroke();
+  },
+  function(c, W, H){                                  /* Bubblefin */
+    var cx = W*0.46, cy = H*0.55, u = Math.min(W,H);
+    c.beginPath(); c.ellipse(cx, cy, u*0.21, u*0.17, 0,0,6.283); c.stroke();
+    c.beginPath(); c.moveTo(cx+u*0.2, cy);
+    c.quadraticCurveTo(cx+u*0.41, cy-u*0.19, cx+u*0.37, cy);
+    c.quadraticCurveTo(cx+u*0.41, cy+u*0.19, cx+u*0.2, cy); c.closePath(); c.stroke();
+    c.beginPath(); c.moveTo(cx-u*0.04, cy-u*0.16);
+    c.quadraticCurveTo(cx, cy-u*0.34, cx+u*0.1, cy-u*0.14); c.stroke();
+    c.beginPath(); c.arc(cx-u*0.1, cy-u*0.04, u*0.055, 0,6.283); c.stroke();
+    c.beginPath(); c.arc(cx-u*0.085, cy-u*0.04, u*0.02, 0,6.283); c.stroke();
+    c.beginPath(); c.arc(cx-u*0.085, cy+u*0.05, u*0.06, 0.15, Math.PI-0.15); c.stroke();
+    c.beginPath(); c.ellipse(cx+u*0.03, cy+u*0.08, u*0.07, u*0.038, 0.45,0,6.283); c.stroke();
+    for(var i=0;i<3;i++){
+      c.beginPath(); c.arc(cx-u*(0.28+i*0.065), cy-u*(0.15+i*0.1), u*(0.035-i*0.008),0,6.283); c.stroke();
+    }
+  },
+  function(c, W, H){                                  /* Leafcub */
+    var cx = W*0.5, cy = H*0.58, u = Math.min(W,H);
+    c.beginPath(); c.ellipse(cx, cy+u*0.05, u*0.2, u*0.16, 0,0,6.283); c.stroke();
+    c.beginPath(); c.arc(cx-u*0.03, cy-u*0.17, u*0.15, 0, 6.283); c.stroke();
+    for(var s=-1;s<=1;s+=2){ c.beginPath(); c.arc(cx-u*0.03+s*u*0.12, cy-u*0.28, u*0.05, 0,6.283); c.stroke(); }
+    for(var e=-1;e<=1;e+=2){ c.beginPath(); c.arc(cx-u*0.03+e*u*0.055, cy-u*0.19, u*0.022,0,6.283); c.stroke(); }
+    c.beginPath(); c.arc(cx-u*0.03, cy-u*0.12, u*0.03, 0, Math.PI); c.stroke();
+    for(var g=-1;g<=1;g+=2){ c.beginPath(); c.ellipse(cx+g*u*0.12, cy+u*0.2, u*0.06, u*0.04,0,0,6.283); c.stroke(); }
+    c.beginPath(); c.moveTo(cx-u*0.03, cy-u*0.32);
+    c.quadraticCurveTo(cx+u*0.1, cy-u*0.47, cx+u*0.17, cy-u*0.36);
+    c.quadraticCurveTo(cx+u*0.06, cy-u*0.28, cx-u*0.03, cy-u*0.32); c.closePath(); c.stroke();
+    c.beginPath(); c.moveTo(cx-u*0.01, cy-u*0.33); c.lineTo(cx+u*0.13, cy-u*0.375); c.stroke();
+  },
+  function(c, W, H){                                  /* Rockling */
+    var cx = W*0.5, cy = H*0.55, u = Math.min(W,H);
+    c.beginPath();
+    c.moveTo(cx-u*0.22, cy+u*0.17); c.lineTo(cx-u*0.27, cy-u*0.06);
+    c.lineTo(cx-u*0.1, cy-u*0.25); c.lineTo(cx+u*0.14, cy-u*0.23);
+    c.lineTo(cx+u*0.27, cy-u*0.02); c.lineTo(cx+u*0.2, cy+u*0.18);
+    c.closePath(); c.stroke();
+    c.beginPath(); c.moveTo(cx-u*0.27, cy-u*0.06); c.lineTo(cx-u*0.06, cy+u*0.02);
+    c.lineTo(cx+u*0.27, cy-u*0.02); c.stroke();
+    c.beginPath(); c.moveTo(cx-u*0.06, cy+u*0.02); c.lineTo(cx-u*0.02, cy+u*0.175); c.stroke();
+    for(var s=-1;s<=1;s+=2){ c.beginPath(); c.arc(cx+s*u*0.085, cy-u*0.11, u*0.04, 0,6.283); c.stroke(); }
+    for(var a=-1;a<=1;a+=2){ c.beginPath(); c.ellipse(cx+a*u*0.3, cy+u*0.04, u*0.07, u*0.045, a*0.5,0,6.283); c.stroke(); }
+  },
+  function(c, W, H){                                  /* Starwisp */
+    var cx = W*0.48, cy = H*0.44, u = Math.min(W,H), R = u*0.24, r2 = u*0.1;
+    c.beginPath();
+    for(var i=0;i<10;i++){
+      var a = (-90 + i*36) * Math.PI/180, rr = (i%2===0) ? R : r2;
+      var x = cx + rr*Math.cos(a), y = cy + rr*Math.sin(a);
+      if(i===0) c.moveTo(x,y); else c.lineTo(x,y);
+    }
+    c.closePath(); c.stroke();
+    for(var s=-1;s<=1;s+=2){ c.beginPath(); c.arc(cx+s*u*0.06, cy-u*0.01, u*0.03,0,6.283); c.stroke(); }
+    c.beginPath(); c.arc(cx, cy+u*0.06, u*0.035, 0, Math.PI); c.stroke();
+    c.beginPath(); c.moveTo(cx, cy+R*0.95);
+    c.quadraticCurveTo(cx+u*0.11, cy+u*0.4, cx-u*0.04, cy+u*0.45);
+    c.quadraticCurveTo(cx-u*0.17, cy+u*0.47, cx-u*0.1, cy+u*0.36); c.stroke();
+  }
+
 ];
 
 /* ---------- 7. doodle pad, Kid Pix style ------------------------------------
@@ -1333,9 +1438,23 @@ BUILD.colour = function(api){
   var g2 = cv.getContext('2d', {willReadFrequently:true});
   var COLS = ['#F4634E','#FF9F52','#FFC031','#4CC483','#2E86B8',
               '#A186E4','#FF93C6','#8A5A3B','#1B2435','#FFFFFF'];
-  var colour = COLS[0], mode = 'fill';
-  var drawing = false, lx = 0, ly = 0;
+  var STICKERS = ['⭐','❤️','🌸','🦋','🌈','🦄','✨','🐝'];
+  var colour = COLS[0], mode = 'fill', sticker = null;
+  var drawing = false, lx = 0, ly = 0, travelled = 0;
   var page = rnd(ART.length);
+
+  function dab(x, y){
+    g2.save();
+    g2.translate(x, y);
+    g2.rotate(Math.random() * 6.283);
+    g2.font = Math.round(cv.width * (0.085 + Math.random() * 0.03)) + 'px serif';
+    g2.textAlign = 'center';
+    g2.textBaseline = 'middle';
+    g2.fillText(sticker, 0, 0);
+    g2.restore();
+    travelled = 0;
+    sfx.tap();
+  }
 
   function redraw(){
     g2.fillStyle = '#fff';
@@ -1373,16 +1492,25 @@ BUILD.colour = function(api){
       sfx.pop();
       return;
     }
-    drawing = true; lx = pt.x; ly = pt.y;
+    drawing = true; lx = pt.x; ly = pt.y; travelled = 0;
     try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    if(mode === 'sticker' && sticker){ dab(pt.x, pt.y); return; }
+    g2.lineCap = 'round';
+    g2.lineJoin = 'round';
     g2.strokeStyle = colour;
-    g2.lineWidth = Math.max(6, cv.width * 0.016);
+    g2.lineWidth = Math.max(6, cv.width * (mode === 'brush' ? 0.042 : 0.013));
     g2.beginPath(); g2.moveTo(pt.x, pt.y); g2.lineTo(pt.x + 0.1, pt.y); g2.stroke();
   });
   cv.addEventListener('pointermove', function(e){
     if(!drawing) return;
     e.preventDefault();
     var pt = at(e);
+    if(mode === 'sticker' && sticker){
+      travelled += Math.abs(pt.x - lx) + Math.abs(pt.y - ly);
+      if(travelled > cv.width * 0.1) dab(pt.x, pt.y);
+      lx = pt.x; ly = pt.y;
+      return;
+    }
     g2.beginPath(); g2.moveTo(lx, ly); g2.lineTo(pt.x, pt.y); g2.stroke();
     lx = pt.x; ly = pt.y;
   });
@@ -1412,12 +1540,25 @@ BUILD.colour = function(api){
     paints.appendChild(sw);
   });
 
-  [{m:'fill', icon:'🪣', label:'Fill a shape'},
-   {m:'pen',  icon:'✏️', label:'Draw by hand'}].forEach(function(t){
+  [{m:'fill',  icon:'🪣', label:'Fill a shape'},
+   {m:'brush', icon:'🖌️', label:'Paint with a fat brush'},
+   {m:'pen',   icon:'✏️', label:'Draw a thin line'}].forEach(function(t){
     var b = chunk(null,'stamp', t.icon);
     b.setAttribute('aria-label', t.label);
     b.setAttribute('aria-pressed', t.m === mode ? 'true' : 'false');
     b.onclick = function(){ mode = t.m; unpress(); b.setAttribute('aria-pressed','true'); sfx.tap(); };
+    kit.appendChild(b);
+  });
+
+  STICKERS.forEach(function(symbol){
+    var b = chunk(null,'stamp', symbol);
+    b.setAttribute('aria-label','Sticker — press and drag to scatter it');
+    b.setAttribute('aria-pressed','false');
+    b.onclick = function(){
+      mode = 'sticker'; sticker = symbol;
+      unpress(); b.setAttribute('aria-pressed','true');
+      sfx.tap();
+    };
     kit.appendChild(b);
   });
 
@@ -1712,6 +1853,7 @@ BUILD.letters = function(api){
 BUILD.mancala = function(api){
   var PITS = 6, SEED = 3, MINE = 6, THEIRS = 13;
   var board = [], busy = false, over = false, justDropped = -1;
+  var tally = 0, tallyAt = -1;   /* 1, 2, 3… as the rocks are counted out */
 
   /* Rocks, not numerals \u2014 you watch them land one at a time. */
   function rocks(n, index){
@@ -1736,12 +1878,14 @@ BUILD.mancala = function(api){
   function pitView(index, mine){
     var n = board[index];
     var live = mine && n > 0 && !busy && !over;
+    var extras = '<span class="count">' + n + '</span>' +
+                 (index === tallyAt ? '<span class="tally">' + tally + '</span>' : '');
     var b;
     if(mine){
-      b = chunk(live ? 'grass' : null, 'pit', rocks(n, index));
+      b = chunk(null, 'pit' + (live ? ' live' : ''), rocks(n, index) + extras);
       if(live) b.onclick = function(){ play(index); };
     } else {
-      b = el('div','pit still', rocks(n, index));
+      b = el('div','pit still', rocks(n, index) + extras);
     }
     b.setAttribute('aria-label', n + (n === 1 ? ' bean' : ' beans'));
     return b;
@@ -1753,7 +1897,8 @@ BUILD.mancala = function(api){
     var wrap = el('div','mancala');
     wrap.appendChild(el('div','store',
       '<span class="sicon">🧌</span>' + rocks(board[THEIRS], THEIRS) +
-      '<span class="snum">' + board[THEIRS] + '</span>'));
+      '<span class="snum">' + board[THEIRS] + '</span>' +
+      (THEIRS === tallyAt ? '<span class="tally">' + tally + '</span>' : '')));
     var rows = el('div','rows');
     var top = el('div','mrow');
     for(var i=PITS-1;i>=0;i--) top.appendChild(pitView(i+7, false));
@@ -1764,7 +1909,8 @@ BUILD.mancala = function(api){
     wrap.appendChild(rows);
     wrap.appendChild(el('div','store',
       '<span class="sicon">' + kid().icon + '</span>' + rocks(board[MINE], MINE) +
-      '<span class="snum">' + board[MINE] + '</span>'));
+      '<span class="snum">' + board[MINE] + '</span>' +
+      (MINE === tallyAt ? '<span class="tally">' + tally + '</span>' : '')));
     api.play.appendChild(wrap);
   }
 
@@ -1772,6 +1918,8 @@ BUILD.mancala = function(api){
     var hand = board[start];
     board[start] = 0;
     justDropped = -1;
+    tally = 0;
+    tallyAt = -1;
     var at = start;
     draw();
     function step(){
@@ -1782,6 +1930,9 @@ BUILD.mancala = function(api){
       if(!mine && at === MINE) at = (at + 1) % 14;
       board[at]++;
       justDropped = at;
+      tally++;
+      tallyAt = at;
+      say(String(tally));          /* counting practice, by accident */
       hand--;
       sfx.tap();
       draw();
@@ -2310,14 +2461,38 @@ try{
 .pad.boom{animation:boomshake .43s ease}
 
 /* mancala */
-.mancala{display:flex; align-items:center; gap:8px; width:100%; height:100%}
-.store{flex:0 0 auto; width:clamp(54px,15vw,78px); align-self:stretch; max-height:300px; border-radius:36px; background:var(--mat); color:var(--ink); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px}
+/* a carved wooden board */
+.mancala{position:relative; display:flex; align-items:center; gap:10px; width:100%; height:100%;
+  padding:12px; border-radius:30px;
+  background:linear-gradient(161deg,#D59A5E 0%,#B9772F 48%,#9A5C22 100%);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.32), inset 0 -4px 0 rgba(0,0,0,.25), 0 9px 0 #6E3F18}
+.mancala::before{content:""; position:absolute; inset:0; border-radius:30px; pointer-events:none;
+  background:repeating-linear-gradient(93deg, rgba(255,255,255,.055) 0 5px, rgba(0,0,0,.05) 5px 12px)}
+.mancala > *{position:relative}
+.store{flex:0 0 auto; width:clamp(54px,15vw,80px); align-self:stretch; max-height:320px; border-radius:40px;
+  background:radial-gradient(ellipse at 50% 26%, #80501F 0%, #5A3413 78%);
+  box-shadow:inset 0 7px 15px rgba(0,0,0,.6), inset 0 -2px 0 rgba(255,255,255,.12);
+  color:#FFF0D8; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px}
 .store .sicon{font-size:22px; line-height:1}
-.store .snum{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums}
-.rows{flex:1; min-width:0; display:flex; flex-direction:column; gap:10px; justify-content:center}
-.mrow{display:grid; grid-template-columns:repeat(6,1fr); gap:7px}
-.pit{aspect-ratio:1; max-height:76px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:clamp(15px,4.4vw,22px); font-variant-numeric:tabular-nums; box-shadow:0 5px 0 var(--ce,var(--card-edge))}
-.pit.still{background:var(--mat); color:var(--ink); box-shadow:none; border:3px solid var(--line)}
+.store .snum{font-size:24px; font-weight:800; font-variant-numeric:tabular-nums}
+.rows{flex:1; min-width:0; display:flex; flex-direction:column; gap:12px; justify-content:center}
+.mrow{display:grid; grid-template-columns:repeat(6,1fr); gap:8px}
+.mancala .pit{position:relative; aspect-ratio:1; max-height:78px; border-radius:50%; display:grid; place-items:center;
+  background:radial-gradient(circle at 50% 30%, #80501F 0%, #5A3413 76%);
+  box-shadow:inset 0 5px 11px rgba(0,0,0,.6), inset 0 -2px 0 rgba(255,255,255,.12);
+  color:#FFF0D8; border:0}
+.mancala .pit.live{box-shadow:inset 0 5px 11px rgba(0,0,0,.5), 0 0 0 4px var(--grass), 0 0 16px rgba(53,220,124,.75)}
+.mancala .pit.live:active{transform:translateY(2px)}
+/* hold a pit to see how many are in it */
+.count{position:absolute; inset:0; display:grid; place-items:center; border-radius:50%;
+  background:rgba(22,12,4,.78); color:#FFF0D8; font-size:clamp(20px,6vw,28px); font-weight:800;
+  opacity:0; transition:opacity .12s ease; pointer-events:none}
+.mancala .pit:hover .count, .mancala .pit:active .count{opacity:1}
+/* 1, 2, 3… as each rock lands */
+.tally{position:absolute; top:-9px; right:-7px; min-width:27px; height:27px; padding:0 6px; border-radius:14px;
+  background:var(--sun); color:#1B2435; font-size:15px; font-weight:800; display:grid; place-items:center;
+  box-shadow:0 2px 0 rgba(0,0,0,.4); animation:tallypop .24s ease-out; z-index:3}
+@keyframes tallypop{from{transform:scale(0)}}
 .rocks{display:flex; flex-wrap:wrap; gap:3px; justify-content:center; align-items:center; max-width:82%}
 .rocks.many{gap:2px}
 .rock{width:11px; height:11px; border-radius:50%; background:#8A5A3B; box-shadow:inset 0 -3px 0 rgba(0,0,0,.28)}
