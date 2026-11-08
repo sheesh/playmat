@@ -644,7 +644,9 @@ function celebrate(g){
   var home = chunk(null, null, '🏠');
   home.setAttribute('aria-label','All games');
   home.onclick = function(){ sfx.tap(); overlay.remove(); renderHome(); };
-  row.appendChild(again); row.appendChild(book); row.appendChild(home);
+  row.appendChild(again);
+  row.appendChild(bookBtn);
+  row.appendChild(home);
   card.appendChild(row);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
