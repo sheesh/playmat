@@ -466,7 +466,7 @@ function renderHome(){
       var wallTile = chunk(null,'tile');
       wallTile.appendChild(el('span','ticon','\ud83d\uddbc\ufe0f'));
       wallTile.appendChild(el('span','tname','My Wall \u00b7 ' + wall().length));
-      wallTile.onclick = function(){ sfx.tap(); renderWall(); };
+      wallTile.onclick = function(){ sfx.tap(); renderWall('doodle'); };
       tiles.appendChild(wallTile);
     }
     mat.appendChild(tiles);
@@ -503,13 +503,22 @@ function renderBook(){
   stage.appendChild(el('p','hint-line', book().length ? 'Finish a game to win another sticker.' : 'Win a sticker by finishing any game.'));
 }
 
-function renderWall(){
+function renderWall(from){
   try{ speechSynthesis.cancel(); }catch(e){}
+  var origin = gameById(from === 'colour' ? 'colour' : 'doodle');
   bar.innerHTML = '';
   var back = chunk('sun','homebtn','<span class="hicon">🏠</span><span class="htext">home</span>');
   back.setAttribute('aria-label','Back to all games');
   back.onclick = function(){ sfx.tap(); renderHome(); };
   bar.appendChild(back);
+
+  /* the way back to drawing, as big as the way home */
+  var again = chunk(origin.c, 'homebtn',
+    '<span class="hicon">' + origin.icon + '</span><span class="htext">draw again</span>');
+  again.setAttribute('aria-label','Draw another picture');
+  again.onclick = function(){ sfx.tap(); runGame(origin); };
+  bar.appendChild(again);
+
   bar.appendChild(el('div','gname', kid().name + "'s Wall"));
   bar.appendChild(el('div','pips'));
   bar.appendChild(soundButton());
@@ -527,16 +536,16 @@ function renderWall(){
     img.src = url;
     img.alt = 'A picture';
     f.appendChild(img);
-    f.onclick = function(){ sfx.tap(); showPicture(i); };
+    f.onclick = function(){ sfx.tap(); showPicture(i, origin.id); };
     room.appendChild(f);
   });
   stage.appendChild(room);
   stage.appendChild(el('p','hint-line', mine.length
-    ? 'Tap a picture to see it big.'
+    ? 'Tap a picture to see it big, or draw another one.'
     : 'Draw something, then tap the frame button to hang it here.'));
 }
 
-function showPicture(index){
+function showPicture(index, from){
   var mine = wall();
   if(!mine[index]) return;
   var overlay = el('div','cheer');
@@ -558,7 +567,7 @@ function showPicture(index){
     save();
     sfx.tap();
     overlay.remove();
-    renderWall();
+    renderWall(from);
   };
   row.appendChild(close);
   row.appendChild(bin);
@@ -1535,6 +1544,7 @@ BUILD.doodle = function(api){
       cv.classList.remove('hung');
       g2.fillStyle = '#fff';
       g2.fillRect(0, 0, cv.width, cv.height);
+      renderWall('doodle');          /* go and look at it */
     }, 620);
   };
   kit.appendChild(hang);
@@ -1698,6 +1708,7 @@ BUILD.colour = function(api){
       cv.classList.remove('hung');
       page++;
       redraw();
+      renderWall('colour');          /* go and look at it */
     }, 620);
   };
   kit.appendChild(hang);
@@ -2076,9 +2087,9 @@ BUILD.mancala = function(api){
       hand--;
       sfx.tap();
       draw();
-      setTimeout(step, 420);     /* slow enough to watch each rock land */
+      setTimeout(step, 620);     /* slow enough to watch each rock land */
     }
-    setTimeout(step, 300);
+    setTimeout(step, 380);
   }
 
   function after(last, mine){
@@ -2559,6 +2570,7 @@ try{
 .car{display:grid; place-items:center; width:clamp(36px,10.5vw,52px); height:clamp(36px,10.5vw,52px); border-radius:12px; background:var(--mat); color:var(--ink); font-size:clamp(21px,6vw,30px)}
 .car.q{background:var(--sun); color:var(--on-color); font-weight:800}
 .prompt.train{gap:6px}
+.homebtn .htext{white-space:nowrap}
 
 /* the wall of pictures */
 .wall{flex:1; min-height:0; overflow-y:auto; border-radius:24px; padding:18px 16px;
