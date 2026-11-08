@@ -231,14 +231,38 @@ function book(){
   if(!state.books[state.player]) state.books[state.player] = [];
   return state.books[state.player];
 }
+function wall(){
+  if(!state.walls[state.player]) state.walls[state.player] = [];
+  return state.walls[state.player];
+}
 
-var state = {player:null, age:3, sound:true, books:{}};
+/* Hangs the canvas on the wall as a small picture. Full-size canvases are far
+   too big for the browser's little storage box, so it is scaled down first. */
+function hangUp(cv){
+  try{
+    var w = 520, h = Math.max(1, Math.round(w * cv.height / cv.width));
+    var shot = document.createElement('canvas');
+    shot.width = w; shot.height = h;
+    var sc = shot.getContext('2d');
+    sc.fillStyle = '#fff';
+    sc.fillRect(0, 0, w, h);
+    sc.drawImage(cv, 0, 0, w, h);
+    var mine = wall();
+    mine.push(shot.toDataURL('image/jpeg', 0.72));
+    if(mine.length > 12) mine.shift();
+    save();
+    return true;
+  }catch(e){ return false; }
+}
+
+var state = {player:null, age:3, sound:true, books:{}, walls:{}};
 try{
   var saved = localStorage.getItem('playmat');
   if(saved){
     var s = JSON.parse(saved);
     if(s && typeof s.sound === 'boolean') state.sound = s.sound;
     if(s && s.books && typeof s.books === 'object') state.books = s.books;
+    if(s && s.walls && typeof s.walls === 'object') state.walls = s.walls;
     if(s && Array.isArray(s.stickers) && !s.books) state.books = {juniper:s.stickers.slice(0,24)};
     if(s && s.player) setPlayerQuietly(s.player);
   }
@@ -246,7 +270,21 @@ try{
 function setPlayerQuietly(id){
   for(var i=0;i<KIDS.length;i++) if(KIDS[i].id === id){ state.player = id; state.age = KIDS[i].age; }
 }
-function save(){ try{ localStorage.setItem('playmat', JSON.stringify(state)); }catch(e){} }
+function save(){
+  try{
+    localStorage.setItem('playmat', JSON.stringify(state));
+  }catch(e){
+    /* out of room: take the oldest pictures down until it fits */
+    for(var tries=0; tries<24; tries++){
+      var dropped = false;
+      for(var id in state.walls){
+        if(state.walls[id] && state.walls[id].length){ state.walls[id].shift(); dropped = true; break; }
+      }
+      if(!dropped) return;
+      try{ localStorage.setItem('playmat', JSON.stringify(state)); return; }catch(e2){}
+    }
+  }
+}
 
 /* ---------- helpers ---------- */
 function el(tag, cls, html){
@@ -424,6 +462,12 @@ function renderHome(){
       bookTile.appendChild(el('span','tname','Stickers \u00b7 ' + book().length));
       bookTile.onclick = function(){ sfx.tap(); renderBook(); };
       tiles.appendChild(bookTile);
+
+      var wallTile = chunk(null,'tile');
+      wallTile.appendChild(el('span','ticon','\ud83d\uddbc\ufe0f'));
+      wallTile.appendChild(el('span','tname','My Wall \u00b7 ' + wall().length));
+      wallTile.onclick = function(){ sfx.tap(); renderWall(); };
+      tiles.appendChild(wallTile);
     }
     mat.appendChild(tiles);
   });
@@ -457,6 +501,70 @@ function renderBook(){
   }
   stage.appendChild(grid);
   stage.appendChild(el('p','hint-line', book().length ? 'Finish a game to win another sticker.' : 'Win a sticker by finishing any game.'));
+}
+
+function renderWall(){
+  try{ speechSynthesis.cancel(); }catch(e){}
+  bar.innerHTML = '';
+  var back = chunk('sun','homebtn','<span class="hicon">🏠</span><span class="htext">home</span>');
+  back.setAttribute('aria-label','Back to all games');
+  back.onclick = function(){ sfx.tap(); renderHome(); };
+  bar.appendChild(back);
+  bar.appendChild(el('div','gname', kid().name + "'s Wall"));
+  bar.appendChild(el('div','pips'));
+  bar.appendChild(soundButton());
+  stage.innerHTML = '';
+
+  var mine = wall();
+  var room = el('div','wall');
+  if(!mine.length){
+    room.appendChild(el('div','wall-empty','🖼️'));
+  }
+  mine.forEach(function(url, i){
+    var f = el('button','frame');
+    f.type = 'button';
+    var img = document.createElement('img');
+    img.src = url;
+    img.alt = 'A picture';
+    f.appendChild(img);
+    f.onclick = function(){ sfx.tap(); showPicture(i); };
+    room.appendChild(f);
+  });
+  stage.appendChild(room);
+  stage.appendChild(el('p','hint-line', mine.length
+    ? 'Tap a picture to see it big.'
+    : 'Draw something, then tap the frame button to hang it here.'));
+}
+
+function showPicture(index){
+  var mine = wall();
+  if(!mine[index]) return;
+  var overlay = el('div','cheer');
+  var card = el('div','bigframe');
+  var f = el('div','frame big');
+  var img = document.createElement('img');
+  img.src = mine[index];
+  img.alt = 'A picture';
+  f.appendChild(img);
+  card.appendChild(f);
+  var row = el('div','row');
+  var close = chunk('sun', null, '👍');
+  close.setAttribute('aria-label','Leave it up');
+  close.onclick = function(){ sfx.tap(); overlay.remove(); };
+  var bin = chunk('tomato', null, '🗑️');
+  bin.setAttribute('aria-label','Take it down');
+  bin.onclick = function(){
+    mine.splice(index, 1);
+    save();
+    sfx.tap();
+    overlay.remove();
+    renderWall();
+  };
+  row.appendChild(close);
+  row.appendChild(bin);
+  card.appendChild(row);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 function earnSticker(){
@@ -1414,6 +1522,21 @@ BUILD.doodle = function(api){
   page.onclick = colouringPage;
   kit.appendChild(page);
 
+  var hang = chunk('grass','stamp','🖼️');
+  hang.setAttribute('aria-label','Frame it and hang it on the wall');
+  hang.onclick = function(){
+    if(!hangUp(cv)) return;
+    sfx.win();
+    say('On the wall!');
+    cv.classList.add('hung');
+    setTimeout(function(){
+      cv.classList.remove('hung');
+      g2.fillStyle = '#fff';
+      g2.fillRect(0, 0, cv.width, cv.height);
+    }, 620);
+  };
+  kit.appendChild(hang);
+
   var blow = chunk('tomato','stamp','💥');
   blow.setAttribute('aria-label','Blow up the picture');
   blow.onclick = boom;
@@ -1561,6 +1684,21 @@ BUILD.colour = function(api){
     };
     kit.appendChild(b);
   });
+
+  var hang = chunk('grass','stamp','🖼️');
+  hang.setAttribute('aria-label','Frame it and hang it on the wall');
+  hang.onclick = function(){
+    if(!hangUp(cv)) return;
+    sfx.win();
+    say('On the wall!');
+    cv.classList.add('hung');
+    setTimeout(function(){
+      cv.classList.remove('hung');
+      page++;
+      redraw();
+    }, 620);
+  };
+  kit.appendChild(hang);
 
   var next = chunk('sky','stamp','➡️');
   next.setAttribute('aria-label','Another picture');
@@ -2420,6 +2558,28 @@ try{
 .car.q{background:var(--sun); color:var(--on-color); font-weight:800}
 .prompt.train{gap:6px}
 
+/* the wall of pictures */
+.wall{flex:1; min-height:0; overflow-y:auto; border-radius:24px; padding:18px 16px;
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(132px,1fr)); gap:18px; align-content:start;
+  background:repeating-linear-gradient(90deg,#F6E7D4 0 24px,#EFDCC4 24px 48px)}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .wall{background:repeating-linear-gradient(90deg,#2B2319 0 24px,#241D15 24px 48px)}
+}
+:root[data-theme="dark"] .wall{background:repeating-linear-gradient(90deg,#2B2319 0 24px,#241D15 24px 48px)}
+.wall-empty{grid-column:1/-1; text-align:center; font-size:56px; opacity:.35; padding:30px 0}
+.frame{border:0; padding:9px; border-radius:7px; cursor:pointer;
+  background:linear-gradient(145deg,#EFC673,#B8822B 60%,#8E6220);
+  box-shadow:0 7px 0 rgba(0,0,0,.28), inset 0 2px 0 rgba(255,255,255,.45)}
+.frame img{display:block; width:100%; border-radius:2px; border:3px solid #fff; background:#fff}
+.frame:nth-child(odd){transform:rotate(-1.6deg)}
+.frame:nth-child(even){transform:rotate(1.3deg)}
+.frame:active{transform:translateY(3px) rotate(0deg)}
+.bigframe{width:100%; max-width:420px; display:flex; flex-direction:column; gap:14px; align-items:center}
+.bigframe .frame.big{transform:none; width:100%; padding:14px; cursor:default}
+.bigframe .row .chunk{min-width:84px; height:58px; font-size:26px; display:grid; place-items:center}
+@keyframes hangup{to{transform:scale(.16) translate(150%,-130%); opacity:0}}
+.pad.hung{animation:hangup .6s ease-in forwards}
+
 /* dot to dot */
 .dotwrap{position:relative; flex:1; min-height:0; width:100%; border-radius:24px; background:var(--mat); overflow:hidden}
 .dotsvg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
@@ -2529,10 +2689,23 @@ try{
 </style>
 
 <script>
-/* the service worker is what makes this work in airplane mode */
+/* The service worker is what makes this work in airplane mode. It is cache
+   first, so without the listener below a device keeps showing the version it
+   cached and only picks up a new one on the NEXT launch. With it, the moment a
+   new worker takes over, the page reloads itself and the update is simply there. */
 if('serviceWorker' in navigator){
+  var hadWorker = !!navigator.serviceWorker.controller;
+  var reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(!hadWorker || reloading) return;   /* first ever install: nothing to refresh */
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js').catch(function(){});
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      reg.update();
+      setInterval(function(){ reg.update(); }, 30 * 60 * 1000);
+    }).catch(function(){});
   });
 }
 </script>
