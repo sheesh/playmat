@@ -197,6 +197,11 @@ var GAMES = [
   {id:'train',      name:'Train',          icon:'🚂', c:'tangerine', rounds:5, kind:'learn'},
   {id:'samekind',   name:"Doesn't Belong", icon:'🧩', c:'bubble',    rounds:5, kind:'learn'},
   {id:'tune',       name:'Copy the Tune',  icon:'🎵', c:'grape', rounds:4, kind:'play'},
+  {id:'dots',       name:'Dot to Dot',     icon:'✏️', c:'sky',   rounds:3, kind:'learn'},
+  {id:'sizes',      name:'Big to Small',   icon:'📏', c:'teal',  rounds:4, kind:'learn'},
+  {id:'rhyme',      name:'Rhyme Time',     icon:'🎤', c:'grape', rounds:5, kind:'learn', minAge:5},
+  {id:'changed',    name:'What Changed?',  icon:'👀', c:'sun',       rounds:5, kind:'play'},
+  {id:'maze',       name:'Find the Way',   icon:'🗺️', c:'tangerine', rounds:3, kind:'play'},
   {id:'balloons',   name:'Pop',            icon:'🎈', c:'tomato',    rounds:3, kind:'play'},
   {id:'memory',     name:'Match',          icon:'🐼', c:'grape',     rounds:3, kind:'play'},
   {id:'different',  name:'Not the Same',   icon:'🔍', c:'teal',      rounds:5, kind:'play'},
@@ -1424,9 +1429,9 @@ BUILD.mancala = function(api){
       hand--;
       sfx.tap();
       draw();
-      setTimeout(step, 170);
+      setTimeout(step, 420);     /* slow enough to watch each rock land */
     }
-    setTimeout(step, 130);
+    setTimeout(step, 300);
   }
 
   function after(last, mine){
@@ -1570,6 +1575,311 @@ BUILD.tune = function(api){
   setTimeout(playSeq, 800);
 };
 
+/* ---------- Dot to Dot: tap the numbers in order, a shape appears ---------- */
+BUILD.dots = function(api){
+  function ring(count, outer, inner){
+    var pts = [];
+    for(var i=0;i<count;i++){
+      var a = (-90 + i * (360 / count)) * Math.PI / 180;
+      var r = (i % 2 === 0 || inner == null) ? outer : inner;
+      pts.push([0.5 + r * Math.cos(a), 0.5 + r * Math.sin(a)]);
+    }
+    return pts;
+  }
+  function pentagram(){
+    var outer = ring(5, 0.40, null);
+    return [outer[0], outer[2], outer[4], outer[1], outer[3]];
+  }
+  var SMALL = [
+    {emoji:'🌟', pts: pentagram()},
+    {emoji:'🏠', pts: [[0.22,0.85],[0.22,0.48],[0.5,0.17],[0.78,0.48],[0.78,0.85]]}
+  ];
+  var BIG = [
+    {emoji:'⭐', pts: ring(10, 0.40, 0.17)},
+    {emoji:'🌸', pts: ring(10, 0.40, 0.23)}
+  ];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play fill';
+    var shape = pick(state.age === 5 ? BIG : SMALL);
+    var pts = shape.pts;
+    api.prompt('<span class="big">✏️</span><span class="ptext">tap 1, then 2, then 3…</span>',
+               'Tap the numbers in order, starting at one');
+
+    var wrap = el('div','dotwrap');
+    var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 100 100');
+    svg.setAttribute('preserveAspectRatio','none');
+    svg.setAttribute('class','dotsvg');
+    var line = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    line.setAttribute('class','dotline');
+    svg.appendChild(line);
+    wrap.appendChild(svg);
+
+    var next = 0, drawn = [], buttons = [];
+    pts.forEach(function(pt, i){
+      var b = chunk(i === 0 ? 'sun' : null, 'dotbtn', String(i + 1));
+      b.style.left = (pt[0] * 100) + '%';
+      b.style.top = (pt[1] * 100) + '%';
+      b.setAttribute('aria-label', String(i + 1));
+      b.onclick = function(){
+        if(i !== next) { api.nope(b); return; }
+        b.classList.add('done');
+        b.style.removeProperty('--c');
+        b.style.removeProperty('--ce');
+        drawn.push((pt[0] * 100).toFixed(1) + ',' + (pt[1] * 100).toFixed(1));
+        line.setAttribute('points', drawn.join(' '));
+        sfx.pop();
+        say(String(i + 1));
+        next++;
+        if(next < pts.length){
+          buttons[next].style.setProperty('--c','var(--sun)');
+          buttons[next].style.setProperty('--ce','var(--sun-e)');
+          return;
+        }
+        drawn.push((pts[0][0] * 100).toFixed(1) + ',' + (pts[0][1] * 100).toFixed(1));
+        line.setAttribute('points', drawn.join(' '));
+        line.classList.add('shut');
+        var prize = el('div','prize', shape.emoji);
+        wrap.appendChild(prize);
+        if(!api.score()) setTimeout(round, 1500);
+      };
+      buttons.push(b);
+      wrap.appendChild(b);
+    });
+
+    api.play.innerHTML = '';
+    api.play.appendChild(wrap);
+  }
+  round();
+};
+
+/* ---------- Big to Small: putting sizes in order ---------- */
+BUILD.sizes = function(api){
+  var SCALES = [1, 0.74, 0.54, 0.39];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var count = state.age === 5 ? 4 : 3;
+    var thing = pick(Content_countable());
+    var items = [];
+    for(var i=0;i<count;i++) items.push({rank:i, scale:SCALES[i]});
+    shuffle(items);
+    api.prompt('<span class="big">📏</span><span class="ptext">tap the biggest one first</span>',
+               'Tap the biggest one first');
+    var row = el('div','sizerow');
+    api.play.innerHTML = '';
+    api.play.appendChild(row);
+    var next = 0, left = count;
+    items.forEach(function(it){
+      var b = chunk(null,'sizebtn', '<span style="font-size:' + Math.round(it.scale * 64) + 'px">' + thing + '</span>');
+      b.setAttribute('aria-label','Picture');
+      b.onclick = function(){
+        if(b.classList.contains('gone')) return;
+        if(it.rank !== next){ api.nope(b); return; }
+        b.classList.add('gone');
+        sfx.pop();
+        next++;
+        left--;
+        if(left === 0 && !api.score()) setTimeout(round, 900);
+      };
+      row.appendChild(b);
+    });
+  }
+  round();
+};
+function Content_countable(){
+  return ['🐟','🍓','🐥','🦋','🚗','⭐','🍎','🐸','🌸','🐞','🍪','🐠'];
+}
+
+/* ---------- Rhyme Time: hearing that two words end the same --------------- */
+BUILD.rhyme = function(api){
+  var PAIRS = [
+    ['🐱','cat','🎩','hat'], ['🐶','dog','🐸','frog'],
+    ['⭐','star','🚗','car'],   ['🐝','bee','🌳','tree'],
+    ['🌙','moon','🥄','spoon'], ['🐭','mouse','🏠','house'],
+    ['🐟','fish','🍽️','dish'], ['🐍','snake','🍰','cake'],
+    ['🐳','whale','🐌','snail'], ['🐐','goat','⛵','boat'],
+    ['🐻','bear','🍐','pear'], ['🌹','rose','👃','nose']
+  ];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var sets = shuffle(PAIRS.slice());
+    var cue = sets[0];
+    var options = shuffle([
+      {e:cue[2], w:cue[3], ok:true},
+      {e:sets[1][0], w:sets[1][1], ok:false},
+      {e:sets[2][0], w:sets[2][1], ok:false}
+    ]);
+    var names = options.map(function(o){ return o.w; });
+    api.prompt('<span class="big">' + cue[0] + '</span><span class="ptext">which one rhymes with ' + cue[1] + '?</span>',
+      'Which one rhymes with ' + cue[1] + '? Is it ' + names[0] + ', ' + names[1] + ', or ' + names[2] + '?');
+    var grid = centred(el('div','grid'), 3, 130);
+    api.play.innerHTML = '';
+    api.play.appendChild(grid);
+    var finished = false, right = null;
+    options.forEach(function(o){
+      var b = chunk(null,'opt', o.e);
+      b.setAttribute('aria-label', o.w);
+      if(o.ok) right = b;
+      b.onclick = function(){
+        if(finished) return;
+        if(o.ok){
+          finished = true;
+          b.classList.add('gone');
+          sfx.pop();
+          say(cue[1] + ', ' + o.w + '. They rhyme!');
+          if(!api.score()) setTimeout(round, 1700);
+        } else {
+          api.nope(b);
+          say('That is a ' + o.w);
+          if(right) right.classList.add('bob');
+        }
+      };
+      grid.appendChild(b);
+    });
+  }
+  round();
+};
+
+/* ---------- What Changed?: a quick look, a blink, one thing different ------ */
+BUILD.changed = function(api){
+  var POOL = ['🐶','🐱','🐼','🦊','🐸','🐥','🐝','🦁',
+              '🍎','🍌','🍪','🍕','🚗','🚌','⛵','🎩'];
+
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play';
+    var count = state.age === 5 ? 5 : 3;
+    var picks = shuffle(POOL.slice());
+    var items = picks.slice(0, count);
+    var spare = picks[count];
+    var swapAt = rnd(count);
+
+    api.prompt('<span class="big">👀</span><span class="ptext">look carefully…</span>', 'Look carefully');
+    var row = centred(el('div','grid'), count, 110);
+    api.play.innerHTML = '';
+    api.play.appendChild(row);
+    var tiles = items.map(function(sym){
+      var b = chunk(null,'opt', sym);
+      b.setAttribute('aria-label','Picture');
+      row.appendChild(b);
+      return b;
+    });
+
+    setTimeout(function(){
+      if(!api.play.isConnected) return;
+      tiles.forEach(function(b){ b.innerHTML = '?'; b.classList.add('hidden-card'); });
+      sfx.tap();
+      setTimeout(function(){
+        if(!api.play.isConnected) return;
+        items[swapAt] = spare;
+        tiles.forEach(function(b, i){
+          b.innerHTML = items[i];
+          b.classList.remove('hidden-card');
+        });
+        api.prompt('<span class="big">🤔</span><span class="ptext">which one changed?</span>', 'Which one changed?');
+        var finished = false;
+        tiles.forEach(function(b, i){
+          b.onclick = function(){
+            if(finished) return;
+            if(i === swapAt){
+              finished = true;
+              b.classList.add('gone');
+              sfx.pop();
+              if(!api.score()) setTimeout(round, 900);
+            } else {
+              api.nope(b);
+              tiles[swapAt].classList.add('bob');
+            }
+          };
+        });
+      }, 700);
+    }, state.age === 5 ? 2300 : 3200);
+  }
+  round();
+};
+
+/* ---------- Find the Way: drag along the stepping stones ------------------- */
+BUILD.maze = function(api){
+  function round(){
+    if(!api.play.isConnected) return;
+    api.play.className = 'play fill';
+    var count = state.age === 5 ? 9 : 5;
+    var waves = state.age === 5 ? 1.6 : 1.0;
+    var phase = Math.random() * 6.283;
+    var pts = [];
+    for(var i=0;i<count;i++){
+      var t = i / (count - 1);
+      var y = 0.5 + 0.30 * Math.sin(t * Math.PI * 2 * waves + phase);
+      pts.push([0.10 + t * 0.80, Math.max(0.16, Math.min(0.84, y))]);
+    }
+    api.prompt('<span class="big">🌟</span><span class="ptext">drag from the star to the house</span>',
+               'Drag your finger from the star to the house');
+
+    var wrap = el('div','mazewrap');
+    var svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox','0 0 100 100');
+    svg.setAttribute('preserveAspectRatio','none');
+    svg.setAttribute('class','mazesvg');
+    var line = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    line.setAttribute('class','mazeline');
+    svg.appendChild(line);
+    wrap.appendChild(svg);
+
+    var next = 0, trail = [], stones = [], finished = false;
+
+    function reach(i){
+      if(finished || i !== next) return;
+      stones[i].classList.add('lit');
+      trail.push((pts[i][0] * 100).toFixed(1) + ',' + (pts[i][1] * 100).toFixed(1));
+      line.setAttribute('points', trail.join(' '));
+      sfx.tap();
+      next++;
+      if(next >= count){
+        finished = true;
+        sfx.pop();
+        say('You found the way!');
+        if(!api.score()) setTimeout(round, 1200);
+      }
+    }
+
+    pts.forEach(function(pt, i){
+      var face = i === 0 ? '🌟' : (i === count - 1 ? '🏠' : '');
+      var b = chunk(i === 0 ? 'sun' : null, 'stone', face);
+      b.style.left = (pt[0] * 100) + '%';
+      b.style.top = (pt[1] * 100) + '%';
+      b.setAttribute('aria-label', i === 0 ? 'Start' : (i === count - 1 ? 'House' : 'Stone ' + (i + 1)));
+      b.onclick = function(){ reach(i); };
+      stones.push(b);
+      wrap.appendChild(b);
+    });
+
+    var down = false;
+    function track(e){
+      if(!down || finished) return;
+      var target = pts[next];
+      if(!target) return;
+      var r = wrap.getBoundingClientRect();
+      var dx = (e.clientX - r.left) - target[0] * r.width;
+      var dy = (e.clientY - r.top) - target[1] * r.height;
+      if(Math.sqrt(dx * dx + dy * dy) < 48) reach(next);
+    }
+    wrap.addEventListener('pointerdown', function(e){ down = true; track(e); });
+    wrap.addEventListener('pointermove', track);
+    wrap.addEventListener('pointerup', function(){ down = false; });
+    wrap.addEventListener('pointercancel', function(){ down = false; });
+
+    api.play.innerHTML = '';
+    api.play.appendChild(wrap);
+  }
+  round();
+};
+
 /* ---------- boot ---------- */
 document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
@@ -1602,6 +1912,30 @@ try{
 .car{display:grid; place-items:center; width:clamp(36px,10.5vw,52px); height:clamp(36px,10.5vw,52px); border-radius:12px; background:var(--mat); color:var(--ink); font-size:clamp(21px,6vw,30px)}
 .car.q{background:var(--sun); color:var(--on-color); font-weight:800}
 .prompt.train{gap:6px}
+
+/* dot to dot */
+.dotwrap{position:relative; flex:1; min-height:0; width:100%; border-radius:24px; background:var(--mat); overflow:hidden}
+.dotsvg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+.dotline{fill:none; stroke:var(--ink); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; vector-effect:non-scaling-stroke}
+.dotline.shut{fill:var(--sun); fill-opacity:.45}
+.dotbtn{position:absolute; width:46px; height:46px; margin:-23px 0 0 -23px; border-radius:50%; display:grid; place-items:center; font-size:19px; font-weight:800; box-shadow:0 4px 0 var(--ce,var(--card-edge))}
+.dotbtn.done{opacity:.5}
+.prize{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:clamp(44px,13vw,80px); animation:popin .45s ease}
+@keyframes popin{from{transform:translate(-50%,-50%) scale(0)}to{transform:translate(-50%,-50%) scale(1)}}
+
+/* big to small */
+.sizerow{display:flex; gap:10px; align-items:center; justify-content:center; flex-wrap:wrap}
+.sizebtn{width:clamp(72px,21vw,104px); height:clamp(96px,27vw,132px); display:grid; place-items:center}
+
+/* what changed */
+.hidden-card{font-weight:800; color:var(--ink-soft)}
+
+/* find the way */
+.mazewrap{position:relative; flex:1; min-height:0; width:100%; border-radius:24px; background:var(--mat); overflow:hidden; touch-action:none}
+.mazesvg{position:absolute; inset:0; width:100%; height:100%; pointer-events:none}
+.mazeline{fill:none; stroke:var(--grass); stroke-width:16; stroke-linecap:round; stroke-linejoin:round; opacity:.55; vector-effect:non-scaling-stroke}
+.stone{position:absolute; width:54px; height:54px; margin:-27px 0 0 -27px; border-radius:50%; display:grid; place-items:center; font-size:22px; box-shadow:0 4px 0 var(--ce,var(--card-edge))}
+.stone.lit{--c:var(--grass); --ce:var(--grass-e)}
 
 /* copy the tune */
 .pad2{transition:transform .09s ease, filter .09s ease}
