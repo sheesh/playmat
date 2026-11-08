@@ -638,9 +638,9 @@ function celebrate(g){
   var again = chunk(g.c, null, '🔄');
   again.setAttribute('aria-label','Play again');
   again.onclick = function(){ sfx.tap(); overlay.remove(); runGame(g); };
-  var book = chunk('sun', null, '📖');
-  book.setAttribute('aria-label','Sticker book');
-  book.onclick = function(){ sfx.tap(); overlay.remove(); renderBook(); };
+  var bookBtn = chunk('sun', null, '📖');
+  bookBtn.setAttribute('aria-label','Sticker book');
+  bookBtn.onclick = function(){ sfx.tap(); overlay.remove(); renderBook(); };
   var home = chunk(null, null, '🏠');
   home.setAttribute('aria-label','All games');
   home.onclick = function(){ sfx.tap(); overlay.remove(); renderHome(); };
