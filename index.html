@@ -196,6 +196,7 @@ var GAMES = [
   {id:'startswith', name:'Starts With',    icon:'👂', c:'grape',     rounds:5, kind:'learn'},
   {id:'train',      name:'Train',          icon:'🚂', c:'tangerine', rounds:5, kind:'learn'},
   {id:'samekind',   name:"Doesn't Belong", icon:'🧩', c:'bubble',    rounds:5, kind:'learn'},
+  {id:'tune',       name:'Copy the Tune',  icon:'🎵', c:'grape', rounds:4, kind:'play'},
   {id:'balloons',   name:'Pop',            icon:'🎈', c:'tomato',    rounds:3, kind:'play'},
   {id:'memory',     name:'Match',          icon:'🐼', c:'grape',     rounds:3, kind:'play'},
   {id:'different',  name:'Not the Same',   icon:'🔍', c:'teal',      rounds:5, kind:'play'},
@@ -205,8 +206,8 @@ var GAMES = [
 
 /* Flip the two ages here if they are the wrong way round. */
 var KIDS = [
-  {id:'juniper', name:'Juniper', icon:'\ud83d\udc78', hue:'bubble', age:5},
-  {id:'francis', name:'Francis', icon:'\ud83e\uddcc', hue:'grass',  age:3}
+  {id:'juniper', name:'Juniper', icon:'\ud83d\udc78', hue:'bubble', age:3},
+  {id:'francis', name:'Francis', icon:'\ud83e\uddcc', hue:'grass',  age:5}
 ];
 function kid(){
   for(var i=0;i<KIDS.length;i++) if(KIDS[i].id === state.player) return KIDS[i];
@@ -223,7 +224,7 @@ function book(){
   return state.books[state.player];
 }
 
-var state = {player:null, age:5, sound:true, books:{}};
+var state = {player:null, age:3, sound:true, books:{}};
 try{
   var saved = localStorage.getItem('playmat');
   if(saved){
@@ -1349,7 +1350,18 @@ BUILD.letters = function(api){
    on every pit, so it doubles as counting practice. */
 BUILD.mancala = function(api){
   var PITS = 6, SEED = 3, MINE = 6, THEIRS = 13;
-  var board = [], busy = false, over = false;
+  var board = [], busy = false, over = false, justDropped = -1;
+
+  /* Rocks, not numerals \u2014 you watch them land one at a time. */
+  function rocks(n, index){
+    if(n === 0) return '';
+    var out = '';
+    for(var i=0;i<n;i++){
+      var fresh = (index === justDropped && i === n - 1) ? ' drop' : '';
+      out += '<span class="rock' + fresh + '"></span>';
+    }
+    return '<span class="rocks' + (n > 6 ? ' many' : '') + '">' + out + '</span>';
+  }
 
   function mySideEmpty(){
     for(var i=0;i<PITS;i++) if(board[i] > 0) return false;
@@ -1365,10 +1377,10 @@ BUILD.mancala = function(api){
     var live = mine && n > 0 && !busy && !over;
     var b;
     if(mine){
-      b = chunk(live ? 'grass' : null, 'pit', String(n));
+      b = chunk(live ? 'grass' : null, 'pit', rocks(n, index));
       if(live) b.onclick = function(){ play(index); };
     } else {
-      b = el('div','pit still', String(n));
+      b = el('div','pit still', rocks(n, index));
     }
     b.setAttribute('aria-label', n + (n === 1 ? ' bean' : ' beans'));
     return b;
@@ -1379,7 +1391,8 @@ BUILD.mancala = function(api){
     api.play.innerHTML = '';
     var wrap = el('div','mancala');
     wrap.appendChild(el('div','store',
-      '<span class="sicon">🧌</span><span class="snum">' + board[THEIRS] + '</span>'));
+      '<span class="sicon">🧌</span>' + rocks(board[THEIRS], THEIRS) +
+      '<span class="snum">' + board[THEIRS] + '</span>'));
     var rows = el('div','rows');
     var top = el('div','mrow');
     for(var i=PITS-1;i>=0;i--) top.appendChild(pitView(i+7, false));
@@ -1389,13 +1402,15 @@ BUILD.mancala = function(api){
     rows.appendChild(bottom);
     wrap.appendChild(rows);
     wrap.appendChild(el('div','store',
-      '<span class="sicon">' + kid().icon + '</span><span class="snum">' + board[MINE] + '</span>'));
+      '<span class="sicon">' + kid().icon + '</span>' + rocks(board[MINE], MINE) +
+      '<span class="snum">' + board[MINE] + '</span>'));
     api.play.appendChild(wrap);
   }
 
   function sow(start, mine, done){
     var hand = board[start];
     board[start] = 0;
+    justDropped = -1;
     var at = start;
     draw();
     function step(){
@@ -1405,6 +1420,7 @@ BUILD.mancala = function(api){
       if(mine && at === THEIRS) at = (at + 1) % 14;
       if(!mine && at === MINE) at = (at + 1) % 14;
       board[at]++;
+      justDropped = at;
       hand--;
       sfx.tap();
       draw();
@@ -1478,6 +1494,82 @@ BUILD.mancala = function(api){
   draw();
 };
 
+/* ---------- Copy the Tune: four pads, a growing sequence --------------------
+   Getting it wrong never ends anything — the tune simply plays again. */
+BUILD.tune = function(api){
+  var PADS = [{hue:'tomato', f:523}, {hue:'sun', f:659}, {hue:'sky', f:784}, {hue:'grass', f:1047}];
+  var seq = [], step = 0, busy = true, buttons = [];
+
+  function build(){
+    api.play.className = 'play';
+    var grid = centred(el('div','grid'), 2, 150);
+    api.play.innerHTML = '';
+    buttons = [];
+    PADS.forEach(function(pad, i){
+      var b = chunk(pad.hue, 'opt pad2', '');
+      b.setAttribute('aria-label', 'Pad ' + (i + 1));
+      b.onclick = function(){ tapped(i); };
+      buttons.push(b);
+      grid.appendChild(b);
+    });
+    api.play.appendChild(grid);
+  }
+
+  function flash(i, then){
+    var b = buttons[i];
+    if(!b) return;
+    b.classList.add('lit');
+    tone(PADS[i].f, 0.3, 'triangle', 0.13);
+    setTimeout(function(){
+      b.classList.remove('lit');
+      if(then) then();
+    }, 340);
+  }
+
+  function playSeq(){
+    if(!api.play.isConnected) return;
+    busy = true;
+    step = 0;
+    api.prompt('<span class="big">🎵</span><span class="ptext">listen</span>', 'Listen');
+    var i = 0;
+    (function next(){
+      if(!api.play.isConnected) return;
+      if(i >= seq.length){
+        busy = false;
+        api.prompt('<span class="big">👆</span><span class="ptext">now your turn</span>', 'Now your turn');
+        return;
+      }
+      flash(seq[i], function(){ i++; setTimeout(next, 170); });
+    })();
+  }
+
+  function tapped(i){
+    if(busy) return;
+    flash(i);
+    if(seq[step] === i){
+      step++;
+      if(step >= seq.length){
+        busy = true;
+        setTimeout(function(){
+          if(!api.score()){
+            seq.push(rnd(4));
+            setTimeout(playSeq, 800);
+          }
+        }, 450);
+      }
+    } else {
+      busy = true;
+      api.nope(buttons[i]);
+      setTimeout(playSeq, 950);   /* just hear it again */
+    }
+  }
+
+  build();
+  var start = state.age === 5 ? 2 : 1;
+  for(var k=0;k<start;k++) seq.push(rnd(4));
+  setTimeout(playSeq, 800);
+};
+
 /* ---------- boot ---------- */
 document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
 document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
@@ -1511,6 +1603,11 @@ try{
 .car.q{background:var(--sun); color:var(--on-color); font-weight:800}
 .prompt.train{gap:6px}
 
+/* copy the tune */
+.pad2{transition:transform .09s ease, filter .09s ease}
+.pad2.lit{filter:brightness(1.35) saturate(1.25); transform:scale(.94)}
+
+
 /* the Kid Pix eraser */
 @keyframes boomshake{
   0%,100%{transform:translate(0,0) rotate(0)}
@@ -1531,6 +1628,15 @@ try{
 .mrow{display:grid; grid-template-columns:repeat(6,1fr); gap:7px}
 .pit{aspect-ratio:1; max-height:76px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:clamp(15px,4.4vw,22px); font-variant-numeric:tabular-nums; box-shadow:0 5px 0 var(--ce,var(--card-edge))}
 .pit.still{background:var(--mat); color:var(--ink); box-shadow:none; border:3px solid var(--line)}
+.rocks{display:flex; flex-wrap:wrap; gap:3px; justify-content:center; align-items:center; max-width:82%}
+.rocks.many{gap:2px}
+.rock{width:11px; height:11px; border-radius:50%; background:#8A5A3B; box-shadow:inset 0 -3px 0 rgba(0,0,0,.28)}
+.rocks.many .rock{width:8px; height:8px}
+.store .rocks{max-width:78%; margin:3px 0}
+.store .rocks .rock{width:9px; height:9px}
+.store .snum{font-size:17px}
+@keyframes rockdrop{from{transform:translateY(-16px) scale(.5); opacity:0}}
+.rock.drop{animation:rockdrop .19s ease-out}
 
 /* who is playing */
 .picker{flex:1; min-height:0; display:flex; flex-direction:column; gap:16px; justify-content:center}
