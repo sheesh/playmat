@@ -1,6 +1,6 @@
 /* Cache first: once installed the app never needs the network again.
    CACHE is stamped by make-pwa.py from a hash of index.html — do not edit by hand. */
-var CACHE = 'playmat-88ce145efec6';
+var CACHE = 'playmat-635ff909cf57';
 var ASSETS = ['./', './index.html', './manifest.webmanifest',
               './icon-180.png', './icon-192.png', './icon-512.png', './icon-maskable-512.png'];
 

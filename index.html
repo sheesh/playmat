@@ -206,6 +206,7 @@ var GAMES = [
   {id:'memory',     name:'Match',          icon:'🐼', c:'grape',     rounds:3, kind:'play'},
   {id:'different',  name:'Not the Same',   icon:'🔍', c:'teal',      rounds:5, kind:'play'},
   {id:'mancala',    name:'Mancala',        icon:'🫘', c:'tangerine', rounds:1, kind:'play'},
+  {id:'colour',     name:'Coloring Book',  icon:'🎨', c:'sky', rounds:0, kind:'play'},
   {id:'doodle',     name:'Doodle',         icon:'🖍️', c:'bubble', rounds:0, kind:'play'}
 ];
 
@@ -895,9 +896,192 @@ BUILD.train = function(api){
   round();
 };
 
+  /* Paint bucket: scanline flood fill with a little tolerance. */
+function floodFill(g2, cv, sx, sy, css){
+  var W = cv.width, H = cv.height;
+  sx = Math.max(0, Math.min(W - 1, Math.round(sx)));
+  sy = Math.max(0, Math.min(H - 1, Math.round(sy)));
+  var img = g2.getImageData(0, 0, W, H), d = img.data;
+  var si = (sy * W + sx) * 4;
+  var sr = d[si], sg = d[si+1], sb = d[si+2];
+  var m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(css);
+  if(!m) return;
+  var fr = parseInt(m[1],16), fg = parseInt(m[2],16), fb = parseInt(m[3],16);
+  if(Math.abs(sr-fr) + Math.abs(sg-fg) + Math.abs(sb-fb) < 12) return;
+  function same(i){
+    return Math.abs(d[i]-sr) + Math.abs(d[i+1]-sg) + Math.abs(d[i+2]-sb) < 90;
+  }
+  var stack = [[sx, sy]];
+  while(stack.length){
+    var pt = stack.pop(), x = pt[0], y = pt[1];
+    var i = (y * W + x) * 4;
+    while(x >= 0 && same((y * W + x) * 4)) x--;
+    x++;
+    var up = false, down = false;
+    while(x < W && same((y * W + x) * 4)){
+      i = (y * W + x) * 4;
+      d[i] = fr; d[i+1] = fg; d[i+2] = fb; d[i+3] = 255;
+      if(y > 0){
+        var u = same(((y-1) * W + x) * 4);
+        if(u && !up){ stack.push([x, y-1]); up = true; } else if(!u){ up = false; }
+      }
+      if(y < H - 1){
+        var dn = same(((y+1) * W + x) * 4);
+        if(dn && !down){ stack.push([x, y+1]); down = true; } else if(!dn){ down = false; }
+      }
+      x++;
+    }
+  }
+  g2.putImageData(img, 0, 0);
+}
+
+
+/* ---------- Line art, drawn with maths -------------------------------------
+   Every picture in the app is generated in code. Nothing is copied from
+   anywhere, and there is not a single image file to download. */
+var ART = [
+  function(c, W, H){                                  /* flower */
+    var cx = W/2, cy = H*0.42, pr = Math.min(W,H)*0.13;
+    c.beginPath(); c.moveTo(cx, cy+pr); c.lineTo(cx, H*0.95); c.stroke();
+    for(var s=-1;s<=1;s+=2){
+      c.beginPath(); c.ellipse(cx+s*pr*0.9, H*0.78, pr*0.75, pr*0.34, s*0.5, 0, 6.283); c.stroke();
+    }
+    for(var i=0;i<8;i++){
+      var a = i*Math.PI/4;
+      c.beginPath();
+      c.ellipse(cx+Math.cos(a)*pr*1.5, cy+Math.sin(a)*pr*1.5, pr*0.75, pr*0.46, a, 0, 6.283);
+      c.stroke();
+    }
+    c.beginPath(); c.arc(cx, cy, pr, 0, 6.283); c.stroke();
+  },
+  function(c, W, H){                                  /* fish */
+    c.beginPath(); c.ellipse(W*0.44, H*0.5, W*0.22, H*0.22, 0, 0, 6.283); c.stroke();
+    c.beginPath(); c.moveTo(W*0.655,H*0.5); c.lineTo(W*0.85,H*0.28); c.lineTo(W*0.85,H*0.72); c.closePath(); c.stroke();
+    c.beginPath(); c.arc(W*0.33, H*0.43, Math.min(W,H)*0.035, 0, 6.283); c.stroke();
+    c.beginPath(); c.ellipse(W*0.46, H*0.3, W*0.07, H*0.06, 0, 0, 6.283); c.stroke();
+    for(var i=0;i<3;i++){
+      c.beginPath(); c.arc(W*(0.18-i*0.04), H*(0.26-i*0.07), Math.min(W,H)*(0.03-i*0.006), 0, 6.283); c.stroke();
+    }
+  },
+  function(c, W, H){                                  /* house */
+    c.strokeRect(W*0.25, H*0.45, W*0.5, H*0.45);
+    c.beginPath(); c.moveTo(W*0.19,H*0.46); c.lineTo(W*0.5,H*0.16); c.lineTo(W*0.81,H*0.46); c.closePath(); c.stroke();
+    c.strokeRect(W*0.44, H*0.64, W*0.13, H*0.26);
+    c.strokeRect(W*0.29, H*0.53, W*0.11, H*0.12);
+    c.strokeRect(W*0.61, H*0.53, W*0.11, H*0.12);
+    c.beginPath(); c.arc(W*0.86, H*0.14, Math.min(W,H)*0.07, 0, 6.283); c.stroke();
+  },
+  function(c, W, H){                                  /* butterfly */
+    var cx = W/2, cy = H*0.52, u = Math.min(W,H);
+    c.beginPath(); c.ellipse(cx, cy, u*0.035, u*0.25, 0, 0, 6.283); c.stroke();
+    for(var s=-1;s<=1;s+=2){
+      c.beginPath(); c.ellipse(cx+s*u*0.21, cy-u*0.14, u*0.2, u*0.15, s*0.4, 0, 6.283); c.stroke();
+      c.beginPath(); c.ellipse(cx+s*u*0.17, cy+u*0.15, u*0.15, u*0.12, -s*0.4, 0, 6.283); c.stroke();
+      c.beginPath(); c.moveTo(cx+s*u*0.02, cy-u*0.24);
+      c.quadraticCurveTo(cx+s*u*0.12, cy-u*0.38, cx+s*u*0.17, cy-u*0.3); c.stroke();
+    }
+  },
+  function(c, W, H){                                  /* crown */
+    var u = Math.min(W,H);
+    c.beginPath();
+    c.moveTo(W*0.18,H*0.72); c.lineTo(W*0.82,H*0.72); c.lineTo(W*0.88,H*0.30);
+    c.lineTo(W*0.69,H*0.50); c.lineTo(W*0.50,H*0.22); c.lineTo(W*0.31,H*0.50);
+    c.lineTo(W*0.12,H*0.30); c.closePath(); c.stroke();
+    c.strokeRect(W*0.18, H*0.72, W*0.64, H*0.12);
+    var tips = [[0.12,0.30],[0.50,0.22],[0.88,0.30]];
+    for(var i=0;i<3;i++){ c.beginPath(); c.arc(W*tips[i][0], H*tips[i][1], u*0.045, 0, 6.283); c.stroke(); }
+    for(var j=0;j<3;j++){ c.beginPath(); c.arc(W*(0.32+j*0.18), H*0.78, u*0.03, 0, 6.283); c.stroke(); }
+  },
+  function(c, W, H){                                  /* castle */
+    function tower(x, w, top){
+      c.strokeRect(W*x, H*top, W*w, H*0.92-H*top);
+      var n = 3, bw = (W*w)/(n*2-1);
+      for(var i=0;i<n;i++) c.strokeRect(W*x+i*bw*2, H*top-H*0.06, bw, H*0.06);
+    }
+    tower(0.10, 0.22, 0.45); tower(0.39, 0.22, 0.32); tower(0.68, 0.22, 0.45);
+    c.beginPath(); c.moveTo(W*0.44,H*0.92); c.lineTo(W*0.44,H*0.68);
+    c.arc(W*0.5, H*0.68, W*0.06, Math.PI, 0); c.lineTo(W*0.56,H*0.92); c.stroke();
+    c.beginPath(); c.moveTo(W*0.50,H*0.26); c.lineTo(W*0.50,H*0.10);
+    c.lineTo(W*0.68,H*0.15); c.lineTo(W*0.50,H*0.20); c.stroke();
+  },
+  function(c, W, H){                                  /* snowflake */
+    var cx = W/2, cy = H/2, r = Math.min(W,H)*0.40;
+    for(var i=0;i<6;i++){
+      var a = i*Math.PI/3;
+      var ex = cx+Math.cos(a)*r, ey = cy+Math.sin(a)*r;
+      c.beginPath(); c.moveTo(cx,cy); c.lineTo(ex,ey); c.stroke();
+      for(var k=1;k<=2;k++){
+        var bx = cx+Math.cos(a)*r*(0.4+k*0.25), by = cy+Math.sin(a)*r*(0.4+k*0.25);
+        for(var s=-1;s<=1;s+=2){
+          c.beginPath(); c.moveTo(bx,by);
+          c.lineTo(bx+Math.cos(a+s*0.9)*r*0.22, by+Math.sin(a+s*0.9)*r*0.22); c.stroke();
+        }
+      }
+    }
+    c.beginPath(); c.arc(cx, cy, r*0.13, 0, 6.283); c.stroke();
+  },
+  function(c, W, H){                                  /* rainbow and clouds */
+    for(var i=0;i<5;i++){
+      c.beginPath(); c.arc(W*0.5, H*0.78, Math.min(W,H)*(0.44-i*0.07), Math.PI, 0); c.stroke();
+    }
+    function cloud(x, y, u){
+      c.beginPath(); c.arc(W*x, H*y, u, Math.PI*0.9, Math.PI*2.1);
+      c.arc(W*x+u*0.9, H*y-u*0.35, u*0.8, Math.PI*1.1, Math.PI*2.0);
+      c.arc(W*x+u*1.8, H*y, u*0.75, Math.PI*1.2, Math.PI*0.2); c.stroke();
+    }
+    cloud(0.06, 0.78, Math.min(W,H)*0.09);
+    cloud(0.70, 0.78, Math.min(W,H)*0.09);
+  },
+  function(c, W, H){                                  /* cat face */
+    var cx = W/2, cy = H*0.55, r = Math.min(W,H)*0.28;
+    c.beginPath(); c.arc(cx, cy, r, 0, 6.283); c.stroke();
+    for(var s=-1;s<=1;s+=2){
+      c.beginPath();
+      c.moveTo(cx+s*r*0.62, cy-r*0.62); c.lineTo(cx+s*r*0.85, cy-r*1.35);
+      c.lineTo(cx+s*r*0.12, cy-r*0.95); c.closePath(); c.stroke();
+      c.beginPath(); c.ellipse(cx+s*r*0.38, cy-r*0.12, r*0.13, r*0.18, 0, 0, 6.283); c.stroke();
+      for(var k=-1;k<=1;k++){
+        c.beginPath(); c.moveTo(cx+s*r*0.25, cy+r*0.35+k*r*0.14);
+        c.lineTo(cx+s*r*1.15, cy+r*0.22+k*r*0.3); c.stroke();
+      }
+    }
+    c.beginPath(); c.moveTo(cx-r*0.12, cy+r*0.22); c.lineTo(cx+r*0.12, cy+r*0.22);
+    c.lineTo(cx, cy+r*0.4); c.closePath(); c.stroke();
+  },
+  function(c, W, H){                                  /* rocket */
+    var cx = W/2, u = Math.min(W,H);
+    c.beginPath(); c.moveTo(cx, H*0.10);
+    c.quadraticCurveTo(cx+u*0.19, H*0.42, cx+u*0.15, H*0.70);
+    c.lineTo(cx-u*0.15, H*0.70);
+    c.quadraticCurveTo(cx-u*0.19, H*0.42, cx, H*0.10); c.stroke();
+    for(var s=-1;s<=1;s+=2){
+      c.beginPath(); c.moveTo(cx+s*u*0.15, H*0.52);
+      c.lineTo(cx+s*u*0.33, H*0.76); c.lineTo(cx+s*u*0.15, H*0.70); c.stroke();
+    }
+    c.beginPath(); c.arc(cx, H*0.38, u*0.08, 0, 6.283); c.stroke();
+    c.beginPath(); c.moveTo(cx-u*0.1, H*0.70);
+    c.quadraticCurveTo(cx, H*0.93, cx+u*0.1, H*0.70); c.stroke();
+  },
+  function(c, W, H){                                  /* ice cream */
+    var cx = W/2, u = Math.min(W,H);
+    c.beginPath(); c.moveTo(cx-u*0.17, H*0.52); c.lineTo(cx+u*0.17, H*0.52);
+    c.lineTo(cx, H*0.93); c.closePath(); c.stroke();
+    for(var i=1;i<=3;i++){
+      c.beginPath(); c.moveTo(cx-u*0.17+i*u*0.085, H*0.52);
+      c.lineTo(cx-u*0.17+i*u*0.085-u*0.09, H*0.93); c.stroke();
+    }
+    c.beginPath(); c.arc(cx-u*0.09, H*0.42, u*0.11, 0, 6.283); c.stroke();
+    c.beginPath(); c.arc(cx+u*0.09, H*0.42, u*0.11, 0, 6.283); c.stroke();
+    c.beginPath(); c.arc(cx, H*0.26, u*0.12, 0, 6.283); c.stroke();
+    c.beginPath(); c.arc(cx, H*0.12, u*0.035, 0, 6.283); c.stroke();
+  }
+];
+
 /* ---------- 7. doodle pad, Kid Pix style ------------------------------------
-   Crayons, a rainbow brush, a sparkle brush, stamps, and an eraser that blows
-   the picture up, because that was the best part of Kid Pix. No rules, no end. */
+   Crayons; a rainbow brush; a sparkle brush; stamps that repeat along a drag so
+   you can paint with hearts; a paint bucket; butterfly symmetry; procedural
+   colouring pages to fill in; and an eraser that blows the picture up. Every
+   picture here is drawn in code — there is not one image file in the app. */
 BUILD.doodle = function(api){
   api.play.className = 'play fill';
   api.play.style.display = 'flex';
@@ -911,11 +1095,11 @@ BUILD.doodle = function(api){
   api.play.appendChild(paints);
   api.play.appendChild(kit);
 
-  var g2 = cv.getContext('2d');
+  var g2 = cv.getContext('2d', {willReadFrequently:true});
   var COLS = ['#1B2435','#F4634E','#FF9F52','#FFC031','#4CC483','#2E86B8','#A186E4','#FF93C6'];
   var STAMPS = ['⭐','❤️','🌈','🦄','🐙','🌸'];
   var SPARKS = ['✨','⭐','🌟','💫'];
-  var colour = COLS[1], mode = 'crayon', stamp = null;
+  var colour = COLS[1], mode = 'crayon', stamp = null, mirror = false;
   var drawing = false, lx = 0, ly = 0, hue = 0, travelled = 0;
 
   function fit(){
@@ -943,43 +1127,82 @@ BUILD.doodle = function(api){
     var r = cv.getBoundingClientRect();
     return {x:(e.clientX - r.left) * (cv.width / r.width), y:(e.clientY - r.top) * (cv.height / r.height)};
   }
-  function drawEmoji(symbol, x, y, scale){
-    g2.save();
-    g2.translate(x, y);
-    g2.rotate(Math.random() * 6.283);
-    g2.font = Math.round(cv.width * scale) + 'px serif';
-    g2.textAlign = 'center';
-    g2.textBaseline = 'middle';
-    g2.fillText(symbol, 0, 0);
-    g2.restore();
+
+  /* Everything draws through these two, so butterfly mode is free. */
+  function segment(x0, y0, x1, y1){
+    g2.beginPath(); g2.moveTo(x0, y0); g2.lineTo(x1, y1); g2.stroke();
+    if(mirror){
+      g2.beginPath();
+      g2.moveTo(cv.width - x0, y0);
+      g2.lineTo(cv.width - x1, y1);
+      g2.stroke();
+    }
+  }
+  function drawEmoji(symbol, x, y, scale, spin){
+    function once(px){
+      g2.save();
+      g2.translate(px, y);
+      g2.rotate(spin == null ? Math.random() * 6.283 : spin);
+      g2.font = Math.round(cv.width * scale) + 'px serif';
+      g2.textAlign = 'center';
+      g2.textBaseline = 'middle';
+      g2.fillText(symbol, 0, 0);
+      g2.restore();
+    }
+    once(x);
+    if(mirror) once(cv.width - x);
+  }
+
+  function bucket(x, y, css){ floodFill(g2, cv, x, y, css); }
+
+  /* Colouring pages, drawn with maths rather than shipped as pictures. */
+  function outline(){
+    g2.strokeStyle = '#1B2435';
+    g2.lineWidth = Math.max(5, cv.width * 0.011);
+    g2.lineJoin = 'round';
+    g2.lineCap = 'round';
+  }
+  var pageAt = 0;
+  function colouringPage(){
+    g2.fillStyle = '#fff';
+    g2.fillRect(0, 0, cv.width, cv.height);
+    outline();
+    ART[pageAt % ART.length](g2, cv.width, cv.height);
+    pageAt++;
+    sfx.pop();
   }
 
   cv.addEventListener('pointerdown', function(e){
     e.preventDefault();
     var pt = at(e);
-    if(mode === 'stamp' && stamp){
-      drawEmoji(stamp, pt.x, pt.y, 0.11);
-      sfx.pop();
-      return;
-    }
-    drawing = true; lx = pt.x; ly = pt.y; travelled = 0;
+    if(mode === 'fill'){ bucket(pt.x, pt.y, colour); sfx.pop(); return; }
+    drawing = true; lx = pt.x; ly = pt.y; travelled = 1e9;   /* stamp at once */
     try{ cv.setPointerCapture(e.pointerId); }catch(err){}
-    g2.lineWidth = Math.max(8, cv.width * (mode === 'rainbow' ? 0.03 : 0.022));
+    if(mode === 'stamp' && stamp){ dab(pt.x, pt.y); return; }
     if(mode === 'sparkle'){ drawEmoji(pick(SPARKS), pt.x, pt.y, 0.055); return; }
+    g2.lineWidth = Math.max(8, cv.width * (mode === 'rainbow' ? 0.03 : 0.022));
     g2.strokeStyle = mode === 'rainbow' ? 'hsl(' + hue + ',85%,55%)' : colour;
-    g2.beginPath();
-    g2.moveTo(pt.x, pt.y);
-    g2.lineTo(pt.x + 0.1, pt.y);
-    g2.stroke();
+    segment(pt.x, pt.y, pt.x + 0.1, pt.y);
   });
+
+  function dab(x, y){
+    drawEmoji(stamp, x, y, 0.09 + Math.random() * 0.03);
+    travelled = 0;
+    sfx.tap();
+  }
 
   cv.addEventListener('pointermove', function(e){
     if(!drawing) return;
     e.preventDefault();
     var pt = at(e);
-    var step = Math.abs(pt.x - lx) + Math.abs(pt.y - ly);
+    travelled += Math.abs(pt.x - lx) + Math.abs(pt.y - ly);
+
+    if(mode === 'stamp' && stamp){
+      if(travelled > cv.width * 0.085) dab(pt.x, pt.y);   /* paint WITH the icon */
+      lx = pt.x; ly = pt.y;
+      return;
+    }
     if(mode === 'sparkle'){
-      travelled += step;
       if(travelled > cv.width * 0.06){
         travelled = 0;
         drawEmoji(pick(SPARKS), pt.x + (Math.random() * 30 - 15), pt.y + (Math.random() * 30 - 15), 0.055);
@@ -991,10 +1214,7 @@ BUILD.doodle = function(api){
       hue = (hue + 7) % 360;
       g2.strokeStyle = 'hsl(' + hue + ',85%,55%)';
     }
-    g2.beginPath();
-    g2.moveTo(lx, ly);
-    g2.lineTo(pt.x, pt.y);
-    g2.stroke();
+    segment(lx, ly, pt.x, pt.y);
     lx = pt.x; ly = pt.y;
   });
   function stop(){ drawing = false; }
@@ -1027,7 +1247,7 @@ BUILD.doodle = function(api){
   }
 
   function unpress(){
-    var all = api.play.querySelectorAll('[aria-pressed]');
+    var all = api.play.querySelectorAll('[aria-pressed]:not([data-keep])');
     for(var i=0;i<all.length;i++) all[i].setAttribute('aria-pressed','false');
   }
 
@@ -1038,15 +1258,18 @@ BUILD.doodle = function(api){
     sw.setAttribute('aria-label','Crayon');
     sw.setAttribute('aria-pressed', c === colour ? 'true' : 'false');
     sw.onclick = function(){
-      colour = c; mode = 'crayon'; stamp = null;
-      unpress(); sw.setAttribute('aria-pressed','true');
+      colour = c;
+      if(mode !== 'fill'){ mode = 'crayon'; stamp = null; }
+      unpress();
+      sw.setAttribute('aria-pressed','true');
       sfx.tap();
     };
     paints.appendChild(sw);
   });
 
   [{m:'rainbow', icon:'🌈', label:'Rainbow brush'},
-   {m:'sparkle', icon:'✨', label:'Sparkle brush'}].forEach(function(t){
+   {m:'sparkle', icon:'✨', label:'Sparkle brush'},
+   {m:'fill',    icon:'🪣', label:'Fill with colour'}].forEach(function(t){
     var b = chunk(null,'stamp', t.icon);
     b.setAttribute('aria-label', t.label);
     b.setAttribute('aria-pressed','false');
@@ -1060,7 +1283,7 @@ BUILD.doodle = function(api){
 
   STAMPS.forEach(function(symbol){
     var b = chunk(null,'stamp', symbol);
-    b.setAttribute('aria-label','Stamp');
+    b.setAttribute('aria-label','Stamp — press and drag to paint with it');
     b.setAttribute('aria-pressed','false');
     b.onclick = function(){
       mode = 'stamp'; stamp = symbol;
@@ -1070,10 +1293,143 @@ BUILD.doodle = function(api){
     kit.appendChild(b);
   });
 
+  var sym = chunk(null,'stamp','🦋');
+  sym.setAttribute('aria-label','Butterfly — everything you draw is mirrored');
+  sym.setAttribute('aria-pressed','false');
+  sym.setAttribute('data-keep','1');
+  sym.onclick = function(){
+    mirror = !mirror;
+    sym.setAttribute('aria-pressed', mirror ? 'true' : 'false');
+    sfx.tap();
+  };
+  kit.appendChild(sym);
+
+  var page = chunk('sky','stamp','🎨');
+  page.setAttribute('aria-label','A new picture to colour in');
+  page.onclick = colouringPage;
+  kit.appendChild(page);
+
   var blow = chunk('tomato','stamp','💥');
   blow.setAttribute('aria-label','Blow up the picture');
   blow.onclick = boom;
   kit.appendChild(blow);
+};
+
+/* ---------- Coloring Book: pick a picture, tap inside the lines ------------
+   The pictures are drawn by the app, not copied from anywhere. */
+BUILD.colour = function(api){
+  api.play.className = 'play fill';
+  api.play.style.display = 'flex';
+  api.play.style.flexDirection = 'column';
+  api.play.style.gap = '8px';
+  var cv = el('canvas','pad');
+  var paints = el('div','tools');
+  var kit = el('div','tools');
+  api.play.innerHTML = '';
+  api.play.appendChild(cv);
+  api.play.appendChild(paints);
+  api.play.appendChild(kit);
+
+  var g2 = cv.getContext('2d', {willReadFrequently:true});
+  var COLS = ['#F4634E','#FF9F52','#FFC031','#4CC483','#2E86B8',
+              '#A186E4','#FF93C6','#8A5A3B','#1B2435','#FFFFFF'];
+  var colour = COLS[0], mode = 'fill';
+  var drawing = false, lx = 0, ly = 0;
+  var page = rnd(ART.length);
+
+  function redraw(){
+    g2.fillStyle = '#fff';
+    g2.fillRect(0, 0, cv.width, cv.height);
+    g2.strokeStyle = '#1B2435';
+    g2.lineWidth = Math.max(5, cv.width * 0.011);
+    g2.lineJoin = 'round';
+    g2.lineCap = 'round';
+    ART[page % ART.length](g2, cv.width, cv.height);
+  }
+
+  function fit(){
+    var r = cv.getBoundingClientRect();
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+    if(cv.width === w && cv.height === h) return false;
+    cv.width = w; cv.height = h;
+    return true;
+  }
+  requestAnimationFrame(function(){ fit(); redraw(); });
+  window.addEventListener('resize', function(){
+    if(cv.isConnected && fit()) redraw();
+  });
+
+  function at(e){
+    var r = cv.getBoundingClientRect();
+    return {x:(e.clientX - r.left) * (cv.width / r.width), y:(e.clientY - r.top) * (cv.height / r.height)};
+  }
+
+  cv.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    var pt = at(e);
+    if(mode === 'fill'){
+      floodFill(g2, cv, pt.x, pt.y, colour);
+      sfx.pop();
+      return;
+    }
+    drawing = true; lx = pt.x; ly = pt.y;
+    try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+    g2.strokeStyle = colour;
+    g2.lineWidth = Math.max(6, cv.width * 0.016);
+    g2.beginPath(); g2.moveTo(pt.x, pt.y); g2.lineTo(pt.x + 0.1, pt.y); g2.stroke();
+  });
+  cv.addEventListener('pointermove', function(e){
+    if(!drawing) return;
+    e.preventDefault();
+    var pt = at(e);
+    g2.beginPath(); g2.moveTo(lx, ly); g2.lineTo(pt.x, pt.y); g2.stroke();
+    lx = pt.x; ly = pt.y;
+  });
+  function stop(){ drawing = false; }
+  cv.addEventListener('pointerup', stop);
+  cv.addEventListener('pointercancel', stop);
+
+  function unpress(){
+    var all = kit.querySelectorAll('[aria-pressed]');
+    for(var i=0;i<all.length;i++) all[i].setAttribute('aria-pressed','false');
+  }
+
+  COLS.forEach(function(c){
+    var sw = el('button','swatch');
+    sw.type = 'button';
+    sw.style.background = c;
+    if(c === '#FFFFFF') sw.style.boxShadow = '0 4px 0 rgba(27,36,53,.28), inset 0 0 0 2px #C2DDEB';
+    sw.setAttribute('aria-label','Colour');
+    sw.setAttribute('aria-pressed', c === colour ? 'true' : 'false');
+    sw.onclick = function(){
+      colour = c;
+      var all = paints.querySelectorAll('[aria-pressed]');
+      for(var i=0;i<all.length;i++) all[i].setAttribute('aria-pressed','false');
+      sw.setAttribute('aria-pressed','true');
+      sfx.tap();
+    };
+    paints.appendChild(sw);
+  });
+
+  [{m:'fill', icon:'🪣', label:'Fill a shape'},
+   {m:'pen',  icon:'✏️', label:'Draw by hand'}].forEach(function(t){
+    var b = chunk(null,'stamp', t.icon);
+    b.setAttribute('aria-label', t.label);
+    b.setAttribute('aria-pressed', t.m === mode ? 'true' : 'false');
+    b.onclick = function(){ mode = t.m; unpress(); b.setAttribute('aria-pressed','true'); sfx.tap(); };
+    kit.appendChild(b);
+  });
+
+  var next = chunk('sky','stamp','➡️');
+  next.setAttribute('aria-label','Another picture');
+  next.onclick = function(){ page++; redraw(); sfx.pop(); };
+  kit.appendChild(next);
+
+  var again = chunk('tomato','stamp','🔄');
+  again.setAttribute('aria-label','Start this picture again');
+  again.onclick = function(){ redraw(); sfx.tap(); };
+  kit.appendChild(again);
 };
 
 /* ---------- 8. how many? count the things, tap the numeral ---------- */
